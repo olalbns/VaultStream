@@ -1,0 +1,399 @@
+/**
+ * StreamVault — App v4
+ * Routing, UI, historique, intercept polling, JSON detection
+ */
+
+// ── Page routing ──────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const target = document.getElementById(`page-${name}`);
+  if (target) target.classList.add('active');
+  document.querySelectorAll('.nav-links a[data-page]').forEach(a =>
+    a.classList.toggle('active', a.dataset.page === name));
+  if (name === 'library')     renderLibrary();
+  if (name === 'home')        renderHomeRecent();
+  if (name === 'queue')       loadQueue();
+  if (name === 'downloader')  refreshDlList();
+  if (name === 'collections') loadCollections();
+  if (name === 'player')      renderSidebarQueue();
+}
+
+function focusInput() {
+  showPage('home');
+  setTimeout(() => document.getElementById('main-url-input')?.focus(), 150);
+}
+
+// ── Input helpers ──────────────────────────────────────
+function onMainInput() {
+  updateClearBtn();
+  const val = document.getElementById('main-url-input').value.trim();
+  if (!val) { setHint(''); return; }
+  // Detect JSON
+  if (val.startsWith('{') || val.startsWith('[')) {
+    setHint('JSON détecté — StreamVault va extraire les liens automatiquement', 'ok');
+    return;
+  }
+  if (val.startsWith('http') && val.includes('.m3u8')) {
+    setHint('Lien HLS/M3U8 détecté — lecture via HLS.js', 'ok'); return;
+  }
+  if (/youtu/.test(val))  { setHint('YouTube détecté', 'ok'); return; }
+  if (/vimeo/.test(val))  { setHint('Vimeo détecté', 'ok');  return; }
+  if (val.length > 10 && !val.startsWith('http')) {
+    setHint('L\'URL doit commencer par https://', 'error'); return;
+  }
+  setHint('');
+}
+
+function clearInput() {
+  const inp = document.getElementById('main-url-input');
+  if (inp) inp.value = '';
+  updateClearBtn(); setHint('');
+}
+
+function updateClearBtn() {
+  const inp = document.getElementById('main-url-input');
+  const btn = document.getElementById('input-clear-btn');
+  if (btn) btn.classList.toggle('show', !!(inp?.value));
+}
+
+function setHint(msg, type = '') {
+  const h = document.getElementById('input-hint');
+  if (!h) return;
+  h.textContent = msg;
+  h.className = 'input-hint' + (type ? ' '+type : '');
+}
+
+function isValidInput(s) {
+  if (!s) return false;
+  if (s.startsWith('{') || s.startsWith('[')) return true; // JSON
+  try { return /^https?:\/\//.test(new URL(s).href); } catch { return false; }
+}
+
+// ── Load from home ─────────────────────────────────────
+async function loadFromHome() {
+  const url = document.getElementById('main-url-input')?.value.trim();
+  if (!url) { setHint('Colle un lien ou JSON', 'error'); return; }
+  if (!isValidInput(url)) { setHint('URL invalide', 'error'); return; }
+
+  setHint('Chargement…', 'info');
+  const btn = document.getElementById('home-load-btn');
+  if (btn) btn.disabled = true;
+
+  try {
+    showPage('player');
+    document.getElementById('nav-player').style.display = '';
+    await Player.load(url);
+    setHint('');
+    const sbInp = document.getElementById('sidebar-url-input');
+    if (sbInp) sbInp.value = url;
+    await refreshAllHistory();
+    toast('▶ Lecture démarrée', '✓');
+  } catch {
+    showPage('home');
+    setHint('Impossible de lire. Vérifie le lien.', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ── Load from sidebar ──────────────────────────────────
+async function loadFromSidebar() {
+  const url = document.getElementById('sidebar-url-input')?.value.trim();
+  if (!url || !isValidInput(url)) { toast('Lien invalide', '⚠'); return; }
+  try {
+    await Player.load(url);
+    await refreshAllHistory();
+    toast('▶ Nouvelle vidéo', '✓');
+  } catch { toast('Lecture impossible', '✗'); }
+}
+
+function retryLoad() {
+  const url = Player.currentUrl;
+  if (url) Player.load(url).catch(() => {});
+}
+
+// ── Player actions ──────────────────────────────────────
+function downloadCurrent() {
+  const url = Player.currentUrl;
+  if (!url) return;
+  // If it's a local download file, serve it
+  if (url.startsWith('/api/downloads/')) {
+    window.open(url + '&download=1', '_blank'); return;
+  }
+  // Otherwise open downloader page with URL pre-filled
+  document.getElementById('dl-url-input').value = url;
+  showPage('downloader');
+  toast('URL copiée dans le téléchargeur', '↓');
+}
+
+function openInTab() {
+  const url = Player.currentUrl;
+  if (url) window.open(url, '_blank');
+}
+
+function copyCurrentUrl() {
+  const url = Player.currentUrl;
+  if (!url) return;
+  navigator.clipboard.writeText(url).then(() => toast('⎘ URL copiée !', '⎘'));
+}
+
+function clearDiag() { Player.clearDiag(); }
+
+// ── History rendering ──────────────────────────────────
+let _allHistory = [];
+
+async function refreshAllHistory() {
+  _allHistory = await API.getHistory();
+  renderSidebarHistory(_allHistory);
+  renderHomeRecent(_allHistory);
+}
+
+function getDomain(url) {
+  try { return new URL(url).hostname.replace('www.',''); }
+  catch { return url.slice(0,40); }
+}
+
+function getYtIdFromUrl(url) {
+  try {
+    const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    return m ? m[1] : null;
+  } catch { return null; }
+}
+
+function makeCardThumb(h) {
+  const ytId = getYtIdFromUrl(h.url);
+  if (ytId) return `<img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.display='none'">`;
+  return `<span class="card-thumb-icon">🎞</span>`;
+}
+
+function makeVideoCard(h, showDel = false) {
+  const ytId = getYtIdFromUrl(h.url);
+  const thumb = ytId
+    ? `<img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.display='none'">`
+    : `<span class="card-thumb-icon">🎞</span>`;
+  const del = showDel
+    ? `<button class="card-del" onclick="deleteAndRefresh(event,'${esc(h.id)}')" title="Supprimer">✕</button>` : '';
+  return `
+    <div class="video-card" onclick="replayFromHistory('${esc(h.url)}')">
+      <div class="card-thumb">${thumb}
+        <div class="card-play-hover">
+          <div class="play-circle-sm">
+            <svg viewBox="0 0 24 24" fill="white" width="16" height="16"><path d="M8 5v14l11-7z"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-domain">${esc(getDomain(h.url))} ${del}</div>
+        <div class="card-meta">
+          <span class="card-time">${esc(h.date)}</span>
+          <span class="card-method">${esc(h.method||'?')}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function renderHomeRecent(history) {
+  if (!history) history = await API.getHistory();
+  const section = document.getElementById('home-recent');
+  const row     = document.getElementById('home-cards-row');
+  if (!section||!row) return;
+  if (!history?.length) { section.style.display='none'; return; }
+  section.style.display = '';
+  row.innerHTML = history.slice(0,10).map(h => makeVideoCard(h)).join('');
+}
+
+function renderSidebarHistory(history) {
+  const el = document.getElementById('sidebar-history');
+  if (!el) return;
+  if (!history?.length) { el.innerHTML='<div class="diag-empty">Aucune vidéo.</div>'; return; }
+  el.innerHTML = history.slice(0,12).map(h => {
+    const ytId = getYtIdFromUrl(h.url);
+    const thumb = ytId
+      ? `<img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.display='none'">`
+      : `<span class="sh-thumb-icon">🎞</span>`;
+    return `<div class="sh-item" onclick="replayFromHistory('${esc(h.url)}')">
+      <div class="sh-thumb">${thumb}</div>
+      <div class="sh-info">
+        <div class="sh-domain">${esc(getDomain(h.url))}</div>
+        <div class="sh-time">${esc(h.method)} · ${esc(h.date)}</div>
+      </div>
+      <button class="sh-del" onclick="deleteAndRefresh(event,'${esc(h.id)}')" title="Supprimer">✕</button>
+    </div>`;
+  }).join('');
+}
+
+let _libFilter = '';
+async function renderLibrary(history) {
+  if (!history) history = await API.getHistory();
+  _allHistory = history;
+  const grid = document.getElementById('library-grid');
+  if (!grid) return;
+  const filtered = _libFilter
+    ? history.filter(h => h.url.toLowerCase().includes(_libFilter) || (h.title||'').toLowerCase().includes(_libFilter))
+    : history;
+  if (!filtered.length) {
+    grid.innerHTML = `<div class="lib-empty">
+      <div class="lib-empty-icon">🎞</div>
+      <p>${_libFilter ? 'Aucun résultat pour "'+esc(_libFilter)+'"' : 'Aucune vidéo dans l\'historique'}</p>
+      <button class="btn-primary" onclick="showPage('home')">Ajouter une vidéo</button>
+    </div>`; return;
+  }
+  grid.innerHTML = filtered.map(h => makeVideoCard(h, true)).join('');
+}
+
+function filterLibrary(val) {
+  _libFilter = val.toLowerCase().trim();
+  renderLibrary(_allHistory);
+}
+
+async function replayFromHistory(url) {
+  document.getElementById('main-url-input').value = url;
+  document.getElementById('sidebar-url-input').value = url;
+  showPage('player');
+  document.getElementById('nav-player').style.display = '';
+  try {
+    await Player.load(url);
+    await refreshAllHistory();
+    toast('▶ Relecture', '✓');
+  } catch { toast('Lecture impossible', '✗'); }
+}
+
+async function deleteAndRefresh(e, id) {
+  e.stopPropagation();
+  await API.deleteHistory(id);
+  await refreshAllHistory();
+  if (document.getElementById('page-library').classList.contains('active'))
+    renderLibrary(_allHistory);
+  toast('Supprimé', '🗑');
+}
+
+async function clearAllHistory() {
+  if (!confirm('Effacer tout l\'historique ?')) return;
+  const history = await API.getHistory();
+  for (const h of history) await API.deleteHistory(h.id);
+  _allHistory = [];
+  await refreshAllHistory();
+  renderLibrary([]);
+  toast('Historique effacé', '✓');
+}
+
+// ── Toast ──────────────────────────────────────────────
+let _toastTimer;
+function toast(msg, icon = '✓') {
+  const el = document.getElementById('toast');
+  document.getElementById('toast-msg').textContent = msg;
+  document.getElementById('toast-icon').textContent = icon;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Intercept polling (from extension) ─────────────────
+setInterval(async () => {
+  try {
+    const res  = await fetch('/api/intercept/latest');
+    const data = await res.json();
+    if (data?.url) {
+      document.getElementById('main-url-input').value    = data.url;
+      document.getElementById('sidebar-url-input').value = data.url;
+      showPage('player');
+      document.getElementById('nav-player').style.display = '';
+      setTimeout(async () => {
+        try {
+          await Player.load(data.url);
+          await refreshAllHistory();
+          toast('▶ Vidéo reçue via extension', '🔌');
+        } catch { toast('Extension: lecture impossible', '✗'); }
+      }, 100);
+    }
+  } catch {}
+}, 2000);
+
+// ── Utils ──────────────────────────────────────────────
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ── Init ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  const inp = document.getElementById('main-url-input');
+  if (inp) {
+    inp.addEventListener('paste', () => setTimeout(() => { updateClearBtn(); onMainInput(); }, 50));
+    inp.addEventListener('keydown', e => { if (e.key==='Enter') loadFromHome(); });
+  }
+  await refreshAllHistory();
+});
+
+// ── Playlist auto-detection on load ──────────────────
+// After player loads, check if URL is a playlist
+const _origPlayerLoad = Player.load.bind(Player);
+// We hook into showPage to trigger playlist load
+const _origShowPage = showPage;
+
+// Override loadFromHome to also load playlist
+async function loadFromHome() {
+  const url = document.getElementById('main-url-input')?.value.trim();
+  if (!url) { setHint('Colle un lien ou JSON', 'error'); return; }
+  if (!isValidInput(url)) { setHint('URL invalide', 'error'); return; }
+
+  setHint('Chargement…', 'info');
+  const btn = document.getElementById('home-load-btn');
+  if (btn) btn.disabled = true;
+
+  try {
+    showPage('player');
+    document.getElementById('nav-player').style.display = '';
+    // Reset playlist state
+    window._playlist = null; window._playlistIdx = -1;
+    const pb = document.getElementById('playlist-block');
+    if (pb) pb.style.display = 'none';
+    hideNextBar();
+
+    // Detect if it looks like a playlist URL (before loading)
+    const isPlaylistUrl = url.includes('list=') || url.includes('/playlist') || url.includes('/channel') || url.includes('/@') ||
+      (url.includes('youtube.com') && !url.includes('watch?v=') && !url.includes('youtu.be'));
+
+    if (isPlaylistUrl) {
+      // For playlists: load playlist first, then play first item
+      setHint('Détection playlist…', 'info');
+      await loadPlaylist(url); // loadPlaylist auto-plays first item
+    } else {
+      // Single video
+      await Player.load(url);
+      // Check if it's also a playlist in background
+      loadPlaylist(url).catch(()=>{});
+    }
+
+    setHint('');
+    const sbInp = document.getElementById('sidebar-url-input');
+    if (sbInp) sbInp.value = url;
+    await refreshAllHistory();
+    await renderSidebarQueue();
+    toast('▶ Lecture démarrée', '✓');
+  } catch {
+    showPage('home');
+    setHint('Impossible de lire. Vérifie le lien.', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function loadFromSidebar() {
+  const url = document.getElementById('sidebar-url-input')?.value.trim();
+  if (!url || !isValidInput(url)) { toast('Lien invalide', '⚠'); return; }
+  window._playlist=null; window._playlistIdx=-1;
+  hideNextBar();
+  const pb=document.getElementById('playlist-block'); if(pb) pb.style.display='none';
+  try {
+    await Player.load(url);
+    await refreshAllHistory();
+    await renderSidebarQueue();
+    toast('▶ Nouvelle vidéo', '✓');
+    loadPlaylist(url).catch(()=>{});
+  } catch { toast('Lecture impossible', '✗'); }
+}
+
+// ── Collections page ──────────────────────────────────
+// showPage already calls loadCollections() when page=collections via the page handler

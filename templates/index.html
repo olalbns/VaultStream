@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamVault</title>
+<link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.12/hls.min.js"></script>
+<link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav id="navbar">
+  <div class="nav-left">
+    <div class="logo" onclick="showPage('home')">
+      <div class="logo-mark">▶</div>
+      <span class="logo-name">STREAMVAULT</span>
+    </div>
+    <ul class="nav-links">
+      <li><a href="#" data-page="home"        onclick="showPage('home')">Accueil</a></li>
+      <li><a href="#" data-page="player"      onclick="showPage('player')" id="nav-player" style="display:none">▶ Lecture</a></li>
+      <li><a href="#" data-page="downloader"  onclick="showPage('downloader')">Télécharger</a></li>
+      <li><a href="#" data-page="queue"       onclick="showPage('queue')">Queue</a></li>
+      <li><a href="#" data-page="collections" onclick="showPage('collections')">Collections</a></li>
+      <li><a href="#" data-page="library"     onclick="showPage('library')">Bibliothèque</a></li>
+      <li><a href="#" data-page="howto"       onclick="showPage('howto')">?</a></li>
+    </ul>
+  </div>
+  <div class="nav-right">
+    <div class="server-status" id="server-status">
+      <div class="status-dot"></div><span>Serveur actif</span>
+    </div>
+    <div class="queue-indicator" id="queue-indicator" style="display:none" onclick="showPage('queue')">
+      <span>≡</span><span id="queue-count">0</span>
+    </div>
+    <button class="btn-nav-add" onclick="focusInput()">+ Vidéo</button>
+  </div>
+</nav>
+
+<!-- ══ HOME ══════════════════════════════════════════════ -->
+<div id="page-home" class="page active">
+  <div class="hero">
+    <div class="hero-ambient"></div><div class="hero-grid"></div>
+    <div class="hero-content">
+      <div class="hero-eyebrow"><span class="live-dot"></span>Proxy · HLS · yt-dlp · Playlists · Collections</div>
+      <h1 class="hero-title">Lis &amp; Télécharge<br><span class="gradient-text">n'importe quelle</span><br>vidéo</h1>
+      <p class="hero-sub">URL directe, playlist YouTube, JSON API, HLS/M3U8 — tout fonctionne.</p>
+      <div class="input-card">
+        <div class="input-card-header">
+          <span class="input-card-label">Lien, playlist ou JSON</span>
+          <div class="input-format-tags">
+            <span class="fmt-tag">Playlist</span><span class="fmt-tag">HLS/M3U8</span>
+            <span class="fmt-tag">YouTube</span><span class="fmt-tag">JSON API</span>
+          </div>
+        </div>
+        <div class="input-row">
+          <div class="input-wrap">
+            <span class="input-icon">↗</span>
+            <input type="text" id="main-url-input" class="url-input"
+              placeholder='URL, playlist, M3U8, ou JSON {"data":{"downloads":[...]}}'
+              autocomplete="off" spellcheck="false"
+              onkeydown="if(event.key==='Enter')loadFromHome()"
+              oninput="onMainInput()"/>
+            <button class="input-clear" id="input-clear-btn" onclick="clearInput()">✕</button>
+          </div>
+          <button class="btn-primary" id="home-load-btn" onclick="loadFromHome()">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            Lire
+          </button>
+        </div>
+        <div class="input-hint" id="input-hint"></div>
+      </div>
+      <div class="feature-row">
+        <div class="feature-pill"><span>📋</span>Playlists auto</div>
+        <div class="feature-pill"><span>📡</span>HLS natif</div>
+        <div class="feature-pill"><span>↓</span>Téléchargement</div>
+        <div class="feature-pill"><span>📁</span>Collections</div>
+        <div class="feature-pill"><span>🔌</span>Extension IDM</div>
+      </div>
+    </div>
+  </div>
+  <div class="home-recent" id="home-recent" style="display:none">
+    <div class="section-title-row">
+      <h2 class="section-title">Récemment regardés</h2>
+      <a href="#" onclick="showPage('library')" class="see-all">Voir tout →</a>
+    </div>
+    <div class="cards-row" id="home-cards-row"></div>
+  </div>
+</div>
+
+<!-- ══ PLAYER ════════════════════════════════════════════ -->
+<div id="page-player" class="page">
+  <!-- Cinema backdrop (full page overlay) -->
+  <div id="cinema-backdrop" style="display:none"></div>
+
+  <div class="player-layout" id="player-layout">
+
+    <!-- ── Main column ── -->
+    <div class="player-main" id="player-main">
+
+      <!-- Top bar -->
+      <div class="player-topbar">
+        <button class="btn-ghost" onclick="showPage('home')">← Retour</button>
+        <div class="player-breadcrumb" id="player-breadcrumb">—</div>
+        <div class="player-topbar-right">
+          <button class="btn-ghost" id="btn-cinema" onclick="toggleCinema()" title="Mode cinéma">⛶ Cinéma</button>
+          <button class="btn-ghost" onclick="openInTab()">↗</button>
+        </div>
+      </div>
+
+      <!-- Video stage -->
+      <div class="player-stage" id="player-stage">
+        <div class="stage-idle" id="stage-idle">
+          <div class="stage-idle-icon">
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+              <circle cx="12" cy="12" r="10"/><path d="M10 8l6 4-6 4V8z"/>
+            </svg>
+          </div>
+          <p>Colle un lien pour démarrer</p>
+        </div>
+        <div class="stage-video" id="stage-video" style="display:none">
+          <video id="main-video" controls autoplay playsinline preload="metadata"></video>
+          <iframe id="embed-iframe"
+            style="display:none;position:absolute;inset:0;width:100%;height:100%;border:none;"
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+          <div class="stage-spinner" id="stage-spinner">
+            <div class="spinner-ring"></div>
+            <div class="spinner-label" id="spinner-label">Connexion…</div>
+            <div class="spinner-sub" id="spinner-sub"></div>
+          </div>
+          <div class="stage-error" id="stage-error" style="display:none">
+            <div class="stage-error-icon">⚠</div>
+            <h3>Lecture impossible</h3>
+            <p id="stage-error-msg"></p>
+            <div class="stage-error-actions">
+              <button class="btn-primary" onclick="retryLoad()">↺ Réessayer</button>
+              <button class="btn-ghost" onclick="openInTab()">↗ Ouvrir</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quality + method bars -->
+      <div class="quality-bar" id="quality-bar" style="display:none"></div>
+      <div class="method-bar" id="method-bar" style="display:none">
+        <div class="method-bar-left">
+          <span class="method-chip" id="method-chip">—</span>
+          <span class="method-url" id="method-url"></span>
+        </div>
+        <div class="method-bar-right">
+          <button class="btn-tiny" onclick="copyCurrentUrl()">⎘</button>
+          <button class="btn-tiny" onclick="quickDownload()">↓ Télécharger</button>
+        </div>
+      </div>
+
+      <!-- Download progress bar (YouTube style) -->
+      <div class="dl-bar" id="dl-bar" style="display:none">
+        <div class="dl-bar-info">
+          <div class="dl-bar-title" id="dl-bar-title">Téléchargement…</div>
+          <div class="dl-bar-progress-wrap">
+            <div class="dl-bar-progress-track">
+              <div class="dl-bar-progress-fill" id="dl-bar-fill"></div>
+            </div>
+            <span class="dl-bar-pct" id="dl-bar-pct">0%</span>
+          </div>
+          <div class="dl-bar-meta" id="dl-bar-meta"></div>
+        </div>
+        <div class="dl-bar-actions">
+          <button class="btn-tiny" id="dl-bar-save-btn" style="display:none" onclick="saveDlFile()">↓ Sauvegarder</button>
+          <button class="btn-tiny" onclick="hideDlBar()">✕</button>
+        </div>
+      </div>
+
+      <!-- ── Video formats panel (below video, like YouTube) ── -->
+      <div class="video-formats-panel" id="video-formats-panel" style="display:none">
+        <div class="vfp-header">
+          <div class="vfp-tabs">
+            <button class="vfp-tab active" onclick="setVfpTab('video',this)">🎬 Vidéo</button>
+            <button class="vfp-tab" onclick="setVfpTab('audio',this)">🎵 Audio</button>
+            <button class="vfp-tab" onclick="setVfpTab('subs',this)">📝 Sous-titres</button>
+          </div>
+          <button class="btn-tiny" onclick="closeVfp()">✕</button>
+        </div>
+        <div id="vfp-video" class="vfp-content active">
+          <div id="vfp-formats-video" class="vfp-grid"></div>
+        </div>
+        <div id="vfp-audio" class="vfp-content">
+          <div id="vfp-formats-audio" class="vfp-grid"></div>
+        </div>
+        <div id="vfp-subs" class="vfp-content">
+          <div id="vfp-formats-subs" class="vfp-grid"></div>
+        </div>
+      </div>
+
+      <!-- New URL input (below) -->
+      <div class="player-bottom-input">
+        <div class="input-wrap" style="flex:1">
+          <span class="input-icon">↗</span>
+          <input type="text" id="sidebar-url-input" class="url-input url-input-sm"
+            placeholder="Colle un nouveau lien ou JSON…"
+            onkeydown="if(event.key==='Enter')loadFromSidebar()"/>
+        </div>
+        <button class="btn-primary btn-sm-sq" onclick="loadFromSidebar()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+      </div>
+
+    </div>
+
+    <!-- ── Sidebar ── -->
+    <div class="player-sidebar" id="player-sidebar">
+
+      <!-- Playlist panel -->
+      <div class="sidebar-block" id="playlist-block" style="display:none">
+        <div class="sidebar-block-title-row">
+          <span class="sidebar-block-title" id="playlist-sidebar-title">Playlist</span>
+          <div style="display:flex;gap:5px;align-items:center">
+            <span class="count-badge" id="playlist-count">0</span>
+            <button class="btn-tiny" onclick="dlPlaylist()">↓</button>
+            <button class="btn-tiny" onclick="addPlaylistToCollection()">+ Col</button>
+          </div>
+        </div>
+        <div class="playlist-list" id="playlist-list"></div>
+        <!-- Playlist select-all download row -->
+        <div class="playlist-dl-row" id="playlist-dl-row" style="display:none">
+          <label style="font-size:11px;display:flex;align-items:center;gap:5px;cursor:pointer">
+            <input type="checkbox" id="pl-check-all" onchange="togglePlSelectAll(this.checked)"> Tout sélectionner
+          </label>
+          <button class="btn-tiny" onclick="dlSelectedPlaylist()">↓ DL sélection</button>
+        </div>
+      </div>
+
+      <!-- Queue panel in sidebar -->
+      <div class="sidebar-block" id="sidebar-queue-block">
+        <div class="sidebar-block-title-row">
+          <span class="sidebar-block-title">Queue</span>
+          <div style="display:flex;gap:5px">
+            <span class="count-badge" id="sidebar-queue-count">0</span>
+            <button class="btn-tiny" onclick="playNextQueue()">▶ Suivant</button>
+            <button class="btn-tiny" onclick="showPage('queue')">Tout voir</button>
+          </div>
+        </div>
+        <div class="sidebar-queue-list" id="sidebar-queue-list">
+          <div class="diag-empty">Queue vide.</div>
+        </div>
+      </div>
+
+      <!-- Subtitles -->
+      <div class="sidebar-block" id="subs-block" style="display:none">
+        <div class="sidebar-block-title">Sous-titres actifs</div>
+        <div class="subs-list" id="subs-list"></div>
+      </div>
+
+      <!-- Diagnostic -->
+      <div class="sidebar-block">
+        <div class="sidebar-block-title-row">
+          <span class="sidebar-block-title">Diagnostic</span>
+          <button class="btn-tiny" onclick="clearDiag()">Effacer</button>
+        </div>
+        <div class="diag-log" id="diag-log">
+          <div class="diag-empty">Lance une vidéo.</div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="sidebar-block">
+        <div class="sidebar-block-title-row">
+          <span class="sidebar-block-title">Historique</span>
+          <a href="#" onclick="showPage('library')" class="see-all-sm">Tout voir</a>
+        </div>
+        <div class="sidebar-history" id="sidebar-history">
+          <div class="diag-empty">Aucune vidéo.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Next video button (floating, appears when playing playlist) ── -->
+  <div class="next-video-bar" id="next-video-bar" style="display:none">
+    <div class="nvb-info">
+      <span class="nvb-label">Suivant</span>
+      <span class="nvb-title" id="nvb-title"></span>
+    </div>
+    <button class="btn-primary" onclick="playNextPlaylistItem()">▶ Lire →</button>
+    <button class="btn-tiny" onclick="hideNextBar()" style="margin-left:4px">✕</button>
+  </div>
+</div>
+
+<!-- ══ DOWNLOADER ════════════════════════════════════════ -->
+<div id="page-downloader" class="page">
+  <div class="dl-layout">
+    <div class="dl-header">
+      <h1 class="page-title">Téléchargeur <span style="font-size:14px;font-family:'Syne';color:var(--cyan);font-weight:600">yt-dlp</span></h1>
+      <p class="page-sub">YouTube, playlists entières, Vimeo, et 1000+ sites.</p>
+    </div>
+    <div class="dl-input-card">
+      <div class="input-row">
+        <div class="input-wrap" style="flex:1">
+          <span class="input-icon">↗</span>
+          <input type="text" id="dl-url-input" class="url-input"
+            placeholder="https://youtube.com/watch?v=… ou playlist"
+            onkeydown="if(event.key==='Enter')analyzeDl()"/>
+        </div>
+        <button class="btn-primary" id="dl-analyze-btn" onclick="analyzeDl()">Analyser</button>
+      </div>
+    </div>
+    <!-- Playlist section -->
+    <div id="dl-playlist-section" style="display:none">
+      <div class="dl-playlist-header">
+        <div>
+          <h2 id="dl-playlist-title" style="font-size:18px;font-weight:700"></h2>
+          <div id="dl-playlist-info" class="dl-meta" style="margin-top:4px"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-primary" onclick="dlPlaylistAll()">↓ Tout télécharger</button>
+          <button class="btn-ghost" onclick="dlPlaylistSelected()">↓ Sélection</button>
+          <button class="btn-ghost" onclick="addPlaylistToColl()">+ Collection</button>
+          <button class="btn-ghost" onclick="addPlaylistToQueue()">+ Queue</button>
+        </div>
+      </div>
+      <!-- Global format selector for playlist -->
+      <div class="pl-global-fmt">
+        <span style="font-size:11px;color:var(--muted);font-weight:600">Format global :</span>
+        <select id="pl-global-fmt-sel" class="fmt-select">
+          <option value="best">Meilleure qualité</option>
+          <option value="bestvideo[height<=1080]+bestaudio">1080p max</option>
+          <option value="bestvideo[height<=720]+bestaudio">720p max</option>
+          <option value="bestvideo[height<=480]+bestaudio">480p max</option>
+          <option value="bestaudio">Audio uniquement</option>
+        </select>
+        <select id="pl-global-ext-sel" class="fmt-select">
+          <option value="mp4">MP4</option>
+          <option value="webm">WebM</option>
+          <option value="mp3">MP3</option>
+          <option value="m4a">M4A</option>
+        </select>
+        <select id="pl-global-sub-sel" class="fmt-select">
+          <option value="">Sans sous-titres</option>
+          <option value="fr">Français</option>
+          <option value="en">Anglais</option>
+          <option value="es">Espagnol</option>
+          <option value="ar">Arabe</option>
+        </select>
+      </div>
+      <div class="playlist-select-bar">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="pl-select-all" onchange="toggleSelectAll(this.checked)"> Tout sélectionner
+        </label>
+        <span id="pl-select-count" style="font-size:11px;color:var(--muted)">0 sélectionné(s)</span>
+      </div>
+      <div id="dl-playlist-items" class="dl-playlist-items"></div>
+    </div>
+    <!-- Single video -->
+    <div id="dl-info-panel" style="display:none">
+      <div class="dl-info-header">
+        <img id="dl-thumb" src="" alt="" style="display:none;width:120px;border-radius:8px;flex-shrink:0">
+        <div class="dl-info-text">
+          <h2 id="dl-title" style="font-size:18px;font-weight:700;margin-bottom:6px"></h2>
+          <div id="dl-meta" class="dl-meta"></div>
+        </div>
+      </div>
+      <div class="format-tabs">
+        <button class="fmt-tab active" onclick="setFmtTab('video',this)">🎬 Vidéo</button>
+        <button class="fmt-tab" onclick="setFmtTab('audio',this)">🎵 Audio</button>
+        <button class="fmt-tab" onclick="setFmtTab('subs',this)">📝 Sous-titres</button>
+      </div>
+      <div id="fmt-video" class="fmt-panel active"><div class="formats-grid" id="formats-video"></div></div>
+      <div id="fmt-audio" class="fmt-panel"><div class="formats-grid" id="formats-audio"></div></div>
+      <div id="fmt-subs"  class="fmt-panel"><div class="formats-grid" id="formats-subs"></div></div>
+    </div>
+    <!-- Downloads -->
+    <div class="dl-list-section">
+      <div class="section-title-row" style="margin-bottom:14px">
+        <h2 class="section-title" style="font-size:20px">Téléchargements</h2>
+        <div style="display:flex;gap:6px">
+          <span id="dl-active-count" style="font-size:11px;color:var(--muted);align-self:center"></span>
+          <button class="btn-ghost" style="font-size:11px" onclick="refreshDlList()">↺</button>
+        </div>
+      </div>
+      <div id="dl-list"><div class="diag-empty">Aucun téléchargement.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ QUEUE ══════════════════════════════════════════════ -->
+<div id="page-queue" class="page">
+  <div class="queue-layout">
+    <div class="queue-header">
+      <h1 class="page-title">Queue de lecture</h1>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-primary" onclick="playNextQueue()">▶ Lire suivant</button>
+        <button class="btn-ghost" onclick="shuffleQueue()">⇌ Mélanger</button>
+        <button class="btn-ghost" onclick="saveQueueAsCollection()">💾 → Collection</button>
+        <button class="btn-danger-sm" onclick="clearQueue()">✕ Vider</button>
+      </div>
+    </div>
+    <div class="queue-add-row">
+      <div class="input-wrap" style="flex:1">
+        <span class="input-icon">+</span>
+        <input type="text" id="queue-url-input" class="url-input"
+          placeholder="Ajouter un lien à la queue…"
+          onkeydown="if(event.key==='Enter')addToQueueManual()"/>
+      </div>
+      <button class="btn-primary" onclick="addToQueueManual()">Ajouter</button>
+    </div>
+    <div id="queue-list" class="queue-list">
+      <div class="diag-empty" id="queue-empty">
+        <div style="font-size:40px;margin-bottom:12px;opacity:0.2">≡</div>
+        Queue vide.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ COLLECTIONS ════════════════════════════════════════ -->
+<div id="page-collections" class="page">
+  <div id="col-list-view">
+    <div class="library-header">
+      <h1 class="library-title">Collections</h1>
+      <button class="btn-primary" onclick="openCreateCollection()">+ Nouvelle</button>
+    </div>
+    <div class="col-grid" id="col-grid">
+      <div class="lib-empty" id="col-empty">
+        <div class="lib-empty-icon">📁</div>
+        <p>Aucune collection.</p>
+        <button class="btn-primary" onclick="openCreateCollection()">Créer</button>
+      </div>
+    </div>
+  </div>
+  <div id="col-detail-view" style="display:none">
+    <div class="library-header">
+      <div style="display:flex;align-items:center;gap:14px">
+        <button class="btn-ghost" onclick="closeCollectionDetail()">← Collections</button>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <span id="col-detail-icon" style="font-size:24px">🎬</span>
+            <h1 class="library-title" id="col-detail-name" style="font-size:28px"></h1>
+          </div>
+          <div id="col-detail-meta" style="font-size:12px;color:var(--muted);margin-top:2px"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-primary" onclick="playCollectionAll()">▶ Tout lire</button>
+        <button class="btn-ghost" onclick="addCollectionToQueue()">+ Queue</button>
+        <button class="btn-ghost" onclick="dlCollectionAll()">↓ Tout DL</button>
+        <button class="btn-ghost" onclick="editCollectionModal()">✏</button>
+        <button class="btn-danger-sm" onclick="deleteCurrentCollection()">🗑</button>
+      </div>
+    </div>
+    <div style="padding:0 40px 16px;max-width:1300px;margin:0 auto">
+      <div style="display:flex;gap:8px">
+        <div class="input-wrap" style="flex:1">
+          <span class="input-icon">+</span>
+          <input type="text" id="col-add-url" class="url-input"
+            placeholder="Ajouter un lien à cette collection…"
+            onkeydown="if(event.key==='Enter')addToCurrentCollection()"/>
+        </div>
+        <button class="btn-primary" onclick="addToCurrentCollection()">Ajouter</button>
+      </div>
+    </div>
+    <div class="library-grid" id="col-detail-grid"></div>
+  </div>
+</div>
+
+<!-- ══ LIBRARY ════════════════════════════════════════════ -->
+<div id="page-library" class="page">
+  <div class="library-header">
+    <h1 class="library-title">Bibliothèque</h1>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div style="position:relative">
+        <input type="text" id="lib-search" class="url-input"
+          style="padding:8px 10px 8px 30px;font-size:12px;width:200px"
+          placeholder="Rechercher…" oninput="filterLibrary(this.value)"/>
+        <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:12px">🔍</span>
+      </div>
+      <button class="btn-danger-sm" onclick="clearAllHistory()">Tout effacer</button>
+    </div>
+  </div>
+  <div class="library-grid" id="library-grid">
+    <div class="lib-empty">
+      <div class="lib-empty-icon">🎞</div>
+      <p>Aucune vidéo dans l'historique</p>
+      <button class="btn-primary" onclick="showPage('home')">Ajouter une vidéo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ HOW IT WORKS ═══════════════════════════════════════ -->
+<div id="page-howto" class="page">
+  <div class="howto-layout">
+    <div class="howto-hero">
+      <h1 class="howto-title">Comment ça fonctionne</h1>
+      <p class="howto-sub">StreamVault est un lecteur vidéo universel avec serveur proxy local. Voici tout ce qu'il peut faire.</p>
+    </div>
+
+    <div class="howto-grid">
+
+      <div class="howto-card">
+        <div class="howto-card-icon">🚀</div>
+        <h3>Démarrage rapide</h3>
+        <ol class="howto-steps">
+          <li>Installe Python 3.8+ et yt-dlp : <code>pip install yt-dlp</code></li>
+          <li>Lance le serveur : <code>python server.py</code></li>
+          <li>Ouvre <code>http://localhost:5000</code></li>
+          <li>Colle n'importe quel lien vidéo et clique <strong>Lire</strong></li>
+        </ol>
+      </div>
+
+      <div class="howto-card">
+        <div class="howto-card-icon">🔄</div>
+        <h3>Cascade de lecture</h3>
+        <p>Pour chaque lien, StreamVault essaie automatiquement :</p>
+        <div class="howto-cascade">
+          <div class="hc-step"><span class="hc-num">1</span><div><strong>API du site</strong><span>Appelle directement l'API hakunaymatata pour obtenir les URLs signées fraîches</span></div></div>
+          <div class="hc-step"><span class="hc-num">2</span><div><strong>yt-dlp</strong><span>Résout les liens CDN signés de 1000+ sites comme IDM</span></div></div>
+          <div class="hc-step"><span class="hc-num">3</span><div><strong>Proxy Python</strong><span>Relaie les requêtes côté serveur pour contourner le CORS</span></div></div>
+          <div class="hc-step"><span class="hc-num">4</span><div><strong>Blob proxy</strong><span>Télécharge en mémoire puis lit localement</span></div></div>
+          <div class="hc-step"><span class="hc-num">5</span><div><strong>Natif</strong><span>Lecture directe <code>&lt;video src&gt;</code> en dernier recours</span></div></div>
+        </div>
+      </div>
+
+      <div class="howto-card">
+        <div class="howto-card-icon">📡</div>
+        <h3>Formats supportés</h3>
+        <div class="howto-badges">
+          <span class="hbadge">MP4</span><span class="hbadge">WebM</span>
+          <span class="hbadge">HLS / M3U8</span><span class="hbadge">DASH / MPD</span>
+          <span class="hbadge">YouTube</span><span class="hbadge">Vimeo</span>
+          <span class="hbadge">CDN signé</span><span class="hbadge">JSON API</span>
+          <span class="hbadge">MKV</span><span class="hbadge">MOV</span>
+        </div>
+        <p style="margin-top:12px;font-size:13px;color:var(--text2)">Pour les playlists, colle l'URL de la playlist YouTube ou d'une chaîne.</p>
+      </div>
+
+      <div class="howto-card">
+        <div class="howto-card-icon">📋</div>
+        <h3>Playlists</h3>
+        <ol class="howto-steps">
+          <li>Colle l'URL d'une playlist ou chaîne YouTube</li>
+          <li>StreamVault détecte automatiquement et extrait toutes les vidéos</li>
+          <li>Le panneau latéral affiche la liste — clique sur une vidéo pour la lire</li>
+          <li>La lecture s'enchaîne automatiquement</li>
+          <li>Télécharge toute la playlist ou une sélection depuis la page Télécharger</li>
+        </ol>
+      </div>
+
+      <div class="howto-card">
+        <div class="howto-card-icon">📋</div>
+        <h3>JSON direct</h3>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:10px">Si le site expose une API JSON avec les URLs (ex: hakunaymatata), colle le JSON directement dans le champ :</p>
+        <pre class="howto-code">{"data":{"downloads":[
+  {"url":"https://cdn.../video.mp4",
+   "resolution":1080,
+   "size":"500000000"}
+]}}</pre>
+        <p style="font-size:12px;color:var(--muted);margin-top:8px">StreamVault extrait les URLs, les trie par qualité et affiche le sélecteur.</p>
+      </div>
+
+      <div class="howto-card">
+        <div class="howto-card-icon">↓</div>
+        <h3>Téléchargement</h3>
+        <ol class="howto-steps">
+          <li>Clique <strong>↓ Télécharger</strong> sous n'importe quelle vidéo en lecture</li>
+          <li>Ou va dans <strong>Télécharger</strong> et analyse une URL</li>
+          <li>Choisis le format, la qualité, la piste audio, les sous-titres</li>
+          <li>La barre de progression s'affiche sous la vidéo</li>
+          <li>Quand c'est prêt, clique <strong>Sauvegarder</strong> pour télécharger</li>
+        </ol>
+      </div>
+
+      <div class="howto-card">
+        <div class="howto-card-icon">🔌</div>
+        <h3>Extension navigateur (IDM-like)</h3>
+        <ol class="howto-steps">
+          <li>Ouvre <code>chrome://extensions</code></li>
+          <li>Active le <strong>Mode développeur</strong></li>
+          <li>Clique <strong>Charger l'extension non empaquetée</strong></li>
+          <li>Sélectionne le dossier <code>streamvault/extension/</code></li>
+          <li>L'extension intercepte les requêtes vidéo exactement comme IDM</li>
+          <li>Elle envoie les headers (cookies, tokens) à StreamVault automatiquement</li>
+        </ol>
+      </div>
+
+      <div class="howto-card">
+        <div class="howto-card-icon">📁</div>
+        <h3>Collections &amp; Queue</h3>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:10px"><strong>Queue :</strong> liste temporaire de lecture. Ajoute des vidéos depuis n'importe où avec <em>+ Queue</em>. La lecture s'enchaîne.</p>
+        <p style="font-size:13px;color:var(--text2)"><strong>Collections :</strong> dossiers persistants. Crée une collection, donne-lui un nom, une couleur, une icône. Ajoute des vidéos individuellement ou une playlist entière en un clic. Elles sont sauvegardées sur disque.</p>
+      </div>
+
+      <div class="howto-card howto-card-wide">
+        <div class="howto-card-icon">⚙</div>
+        <h3>API du serveur</h3>
+        <div class="howto-api-table">
+          <div class="hat-row"><code>GET /api/resolve?url=</code><span>Résout une URL via API site / yt-dlp</span></div>
+          <div class="hat-row"><code>GET /api/proxy?url=</code><span>Stream relay avec support Range (seek)</span></div>
+          <div class="hat-row"><code>GET /api/playlist?url=</code><span>Extrait toutes les vidéos d'une playlist</span></div>
+          <div class="hat-row"><code>GET /api/video/info?url=</code><span>Formats, audio, sous-titres d'une vidéo</span></div>
+          <div class="hat-row"><code>POST /api/ytdl/download</code><span>Lance un téléchargement yt-dlp</span></div>
+          <div class="hat-row"><code>POST /api/ytdl/download/batch</code><span>Téléchargement en lot (playlist)</span></div>
+          <div class="hat-row"><code>GET /api/collections</code><span>Liste les collections</span></div>
+          <div class="hat-row"><code>POST /api/intercept</code><span>Reçoit les URLs depuis l'extension</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODALS ══════════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-collection" style="display:none" onclick="if(event.target===this)closeModal('modal-collection')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-col-title">Nouvelle collection</h3>
+      <button class="modal-close" onclick="closeModal('modal-collection')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-field"><label>Nom</label><input type="text" id="col-form-name" class="url-input" placeholder="Ma collection…"/></div>
+      <div class="modal-field"><label>Description</label><input type="text" id="col-form-desc" class="url-input" placeholder="Description…"/></div>
+      <div class="modal-field">
+        <label>Icône</label>
+        <div class="icon-picker" id="icon-picker">🎬 🎵 🎮 🎥 📺 🎞 🍿 🌟 🔥 💎 🚀 🎭 📽 🎪 🏆 ❤ 🌈 🎯</div>
+        <input type="text" id="col-form-icon" class="url-input" style="margin-top:6px" placeholder="ou tape un emoji…" maxlength="2" value="🎬"/>
+      </div>
+      <div class="modal-field">
+        <label>Couleur</label>
+        <div class="color-picker">
+          <button class="cp-btn" data-color="#e5091a" style="background:#e5091a" onclick="setColColor('#e5091a',this)"></button>
+          <button class="cp-btn" data-color="#ff6b35" style="background:#ff6b35" onclick="setColColor('#ff6b35',this)"></button>
+          <button class="cp-btn" data-color="#00cfff" style="background:#00cfff" onclick="setColColor('#00cfff',this)"></button>
+          <button class="cp-btn" data-color="#00e676" style="background:#00e676" onclick="setColColor('#00e676',this)"></button>
+          <button class="cp-btn" data-color="#ffd740" style="background:#ffd740" onclick="setColColor('#ffd740',this)"></button>
+          <button class="cp-btn" data-color="#b980ff" style="background:#b980ff" onclick="setColColor('#b980ff',this)"></button>
+          <button class="cp-btn" data-color="#ffffff" style="background:#ffffff" onclick="setColColor('#ffffff',this)"></button>
+        </div>
+        <input type="hidden" id="col-form-color" value="#e5091a"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('modal-collection')">Annuler</button>
+      <button class="btn-primary" onclick="submitCollectionForm()">Sauvegarder</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-add-to-col" style="display:none" onclick="if(event.target===this)closeModal('modal-add-to-col')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Ajouter à une collection</h3>
+      <button class="modal-close" onclick="closeModal('modal-add-to-col')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="add-to-col-list"></div>
+      <button class="btn-ghost" style="width:100%;margin-top:8px;justify-content:center" onclick="openCreateCollection();closeModal('modal-add-to-col')">+ Nouvelle collection</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <span class="toast-icon" id="toast-icon">✓</span>
+  <span id="toast-msg"></span>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script src="/static/js/player.js"></script>
+<script src="/static/js/downloader.js"></script>
+<script src="/static/js/queue.js"></script>
+<script src="/static/js/collections.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

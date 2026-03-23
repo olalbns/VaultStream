@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamVault</title>
+<style>
+  :root {
+    --bg:     #07090f;
+    --s1:     #0e1120;
+    --s2:     #141826;
+    --border: rgba(255,255,255,0.08);
+    --red:    #e5091a;
+    --cyan:   #00cfff;
+    --green:  #00e676;
+    --yellow: #ffd740;
+    --text:   #e8ecf5;
+    --muted:  #6b7891;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    width: 360px; min-height: 200px;
+    font-size: 13px;
+  }
+
+  /* Header */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--s1);
+  }
+  .logo { display: flex; align-items: center; gap: 8px; }
+  .logo-icon {
+    width: 26px; height: 26px; border-radius: 6px;
+    background: linear-gradient(135deg, var(--red), #ff6b35);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+  }
+  .logo-name { font-weight: 700; font-size: 14px; letter-spacing: 0.5px; }
+  .server-dot {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--muted);
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: #555; }
+  .dot.ok { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .dot.fail { background: var(--red); }
+
+  /* Tabs */
+  .tabs {
+    display: flex; border-bottom: 1px solid var(--border);
+    background: var(--s1);
+  }
+  .tab {
+    flex: 1; padding: 9px; text-align: center;
+    font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+    text-transform: uppercase; color: var(--muted);
+    cursor: pointer; border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .tab.active { color: var(--text); border-bottom-color: var(--red); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* Tab panels */
+  .panel { display: none; padding: 12px 14px; }
+  .panel.active { display: block; }
+
+  /* Video list */
+  .video-list { display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow-y: auto; }
+  .video-list::-webkit-scrollbar { width: 4px; }
+  .video-list::-webkit-scrollbar-thumb { background: var(--s2); border-radius: 2px; }
+
+  .video-item {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+    display: flex; align-items: flex-start; gap: 10px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .video-item:hover { border-color: rgba(229,9,26,0.3); background: var(--s2); }
+  .vi-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+  .vi-body { flex: 1; min-width: 0; }
+  .vi-url {
+    font-size: 11px; font-weight: 500; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-bottom: 2px;
+  }
+  .vi-meta { font-size: 10px; color: var(--muted); }
+  .vi-btn {
+    background: var(--red); color: white; border: none;
+    border-radius: 5px; padding: 5px 10px;
+    font-size: 11px; font-weight: 700; cursor: pointer;
+    flex-shrink: 0; white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .vi-btn:hover { background: #c5070f; }
+  .vi-btn.sent { background: var(--green); color: #000; }
+
+  .empty {
+    text-align: center; padding: 30px 20px;
+    color: var(--muted); font-size: 12px; line-height: 1.6;
+  }
+  .empty-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.3; }
+
+  /* Manual input */
+  .manual-section { margin-top: 8px; }
+  .label { font-size: 10px; font-weight: 700; letter-spacing: 1px;
+           text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .input-row { display: flex; gap: 6px; }
+  input[type=url], input[type=text] {
+    flex: 1; background: var(--s1); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 10px; color: var(--text);
+    font-size: 12px; outline: none; transition: border-color 0.15s;
+  }
+  input:focus { border-color: rgba(0,207,255,0.4); }
+  input::placeholder { color: var(--muted); }
+  .btn-send {
+    background: var(--red); color: white; border: none;
+    border-radius: 6px; padding: 8px 14px;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .btn-send:hover { background: #c5070f; }
+
+  /* Settings */
+  .setting-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-label { font-size: 12px; font-weight: 500; }
+  .setting-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  /* Toggle */
+  .toggle { position: relative; width: 34px; height: 18px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-track {
+    position: absolute; inset: 0; background: #333;
+    border-radius: 9px; cursor: pointer; transition: 0.2s;
+  }
+  .toggle-track::after {
+    content: ''; position: absolute; left: 2px; top: 2px;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: white; transition: 0.2s;
+  }
+  input:checked + .toggle-track { background: var(--red); }
+  input:checked + .toggle-track::after { transform: translateX(16px); }
+
+  /* Open button */
+  .btn-open {
+    width: 100%; background: var(--s1); border: 1px solid var(--border);
+    color: var(--text); border-radius: 7px; padding: 9px;
+    font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 8px;
+    transition: all 0.15s; display: flex; align-items: center;
+    justify-content: center; gap: 6px;
+  }
+  .btn-open:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  .status-bar {
+    padding: 6px 14px; font-size: 10px; color: var(--muted);
+    border-top: 1px solid var(--border); background: var(--s1);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .btn-clear { background: none; border: none; color: var(--muted);
+               font-size: 10px; cursor: pointer; }
+  .btn-clear:hover { color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <div class="logo-icon">▶</div>
+    <span class="logo-name">StreamVault</span>
+  </div>
+  <div class="server-dot">
+    <div class="dot" id="server-dot"></div>
+    <span id="server-label">Vérification…</span>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-tab="detected">Détectées <span id="count-badge"></span></div>
+  <div class="tab" data-tab="manual">Manuel</div>
+  <div class="tab" data-tab="settings">⚙</div>
+</div>
+
+<!-- Panel : Vidéos détectées -->
+<div class="panel active" id="panel-detected">
+  <div class="video-list" id="video-list">
+    <div class="empty">
+      <div class="empty-icon">🎬</div>
+      Navigue sur une page vidéo.<br>Les liens seront détectés automatiquement.
+    </div>
+  </div>
+  <button class="btn-open" onclick="openSV()">↗ Ouvrir StreamVault</button>
+</div>
+
+<!-- Panel : Envoi manuel -->
+<div class="panel" id="panel-manual">
+  <div class="manual-section">
+    <div class="label">Lien vidéo direct</div>
+    <div class="input-row">
+      <input type="url" id="manual-url" placeholder="https://cdn.exemple.com/video.mp4?sign=…" />
+      <button class="btn-send" onclick="sendManual()">Lire</button>
+    </div>
+  </div>
+  <div class="manual-section" style="margin-top:14px;">
+    <div class="label">URL de la page</div>
+    <div class="input-row">
+      <input type="url" id="manual-page" placeholder="https://hakunaymatata.com/watch/…" />
+      <button class="btn-send" onclick="sendPage()">Analyser</button>
+    </div>
+    <p style="font-size:10px;color:var(--muted);margin-top:6px;line-height:1.5;">
+      Colle l'URL de la page de la vidéo. StreamVault essaiera d'extraire les liens automatiquement.
+    </p>
+  </div>
+</div>
+
+<!-- Panel : Settings -->
+<div class="panel" id="panel-settings">
+  <div class="setting-row">
+    <div>
+      <div class="setting-label">Envoi automatique</div>
+      <div class="setting-sub">Envoie chaque vidéo détectée à StreamVault</div>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="toggle-auto" onchange="saveConfig()">
+      <div class="toggle-track"></div>
+    </label>
+  </div>
+  <div class="setting-row">
+    <div>
+      <div class="setting-label">Notifications</div>
+      <div class="setting-sub">Affiche une notification quand une vidéo est détectée</div>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="toggle-notif" onchange="saveConfig()">
+      <div class="toggle-track"></div>
+    </label>
+  </div>
+  <div class="setting-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
+    <div class="setting-label">URL du serveur StreamVault</div>
+    <div class="input-row" style="width:100%;">
+      <input type="text" id="sv-url-input" placeholder="http://localhost:5000" />
+      <button class="btn-send" onclick="saveConfig()">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <span id="status-text">Prêt</span>
+  <button class="btn-clear" onclick="clearDetected()">Effacer la liste</button>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>
