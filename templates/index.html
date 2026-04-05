@@ -14,32 +14,33 @@
 
 <!-- NAVBAR -->
 <nav id="navbar">
-  <div class="nav-left">
-    <div class="logo" onclick="showPage('home')">
-      <div class="logo-mark">▶</div>
-      <span class="logo-name">STREAMVAULT</span>
+  <div class="nav-container">
+    <div class="nav-left">
+      <div class="logo" onclick="showPage('home')">
+        <div class="logo-mark">▶</div>
+        <span class="logo-name">STREAMVAULT</span>
+      </div>
+      <div class="nav-search">
+        <input type="text" id="nav-search-input" placeholder="Rechercher..." onkeydown="if(event.key==='Enter')globalSearch()">
+        <button onclick="globalSearch()">🔍</button>
+      </div>
     </div>
-    <ul class="nav-links">
-      <li><a href="#" data-page="home"        onclick="showPage('home')">Accueil</a></li>
-      <li><a href="#" data-page="player"      onclick="showPage('player')" id="nav-player" style="display:none">▶ Lecture</a></li>
-      <li><a href="#" data-page="downloader"  onclick="showPage('downloader')">Télécharger</a></li>
-      <li><a href="#" data-page="queue"       onclick="showPage('queue')">Queue</a></li>
-      <li><a href="#" data-page="collections" onclick="showPage('collections')">Collections</a></li>
-      <li><a href="#" data-page="library"     onclick="showPage('library')">Bibliothèque</a></li>
+    
+    <ul class="nav-links" id="nav-menu">
+      <li><a href="#" data-page="home"        onclick="showPage('home')"><span>🏠</span> Accueil</a></li>
+      <li><a href="#" data-page="downloader"  onclick="showPage('downloader')"><span>↓</span> Télécharger</a></li>
+      <li><a href="#" data-page="queue"       onclick="showPage('queue')"><span>≡</span> Queue</a></li>
+      <li><a href="#" data-page="collections" onclick="showPage('collections')"><span>📁</span> Collections</a></li>
+      <li><a href="#" data-page="library"     onclick="showPage('library')"><span>📚</span> Bibliothèque</a></li>
+      <li id="nav-player-li" style="display:none"><a href="#" data-page="player" onclick="showPage('player')"><span>▶</span> Lecture</a></li>
     </ul>
-    <div class="nav-search">
-      <input type="text" id="nav-search-input" placeholder="Rechercher..." onkeydown="if(event.key==='Enter')globalSearch()">
-      <button onclick="globalSearch()">🔍</button>
+
+    <div class="nav-right">
+      <div class="server-status" id="server-status">
+        <div class="status-dot"></div><span>Online</span>
+      </div>
+      <button class="btn-nav-add" onclick="focusInput()">+</button>
     </div>
-  </div>
-  <div class="nav-right">
-    <div class="server-status" id="server-status">
-      <div class="status-dot"></div><span>Serveur actif</span>
-    </div>
-    <div class="queue-indicator" id="queue-indicator" style="display:none" onclick="showPage('queue')">
-      <span>≡</span><span id="queue-count">0</span>
-    </div>
-    <button class="btn-nav-add" onclick="focusInput()">+ Vidéo</button>
   </div>
 </nav>
 
