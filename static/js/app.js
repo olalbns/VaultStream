@@ -8,8 +8,12 @@ function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const target = document.getElementById(`page-${name}`);
   if (target) target.classList.add('active');
-  document.querySelectorAll('.nav-links a[data-page]').forEach(a =>
-    a.classList.toggle('active', a.dataset.page === name));
+  
+  // Mise à jour de l'état actif (inclut le support pour les icônes sur mobile)
+  document.querySelectorAll('.nav-links a[data-page]').forEach(a => {
+    a.classList.toggle('active', a.dataset.page === name);
+  });
+
   if (name === 'library')     renderLibrary();
   if (name === 'home')        renderHomeRecent();
   if (name === 'queue')       loadQueue();
@@ -157,7 +161,9 @@ async function loadFromHome() {
 
   try {
     showPage('player');
-    document.getElementById('nav-player').style.display = '';
+    const plLi = document.getElementById('nav-player-li');
+    if (plLi) plLi.style.display = 'block';
+    
     await Player.load(url);
     setHint('');
     const sbInp = document.getElementById('sidebar-url-input');
