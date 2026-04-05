@@ -418,6 +418,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (inp) {
     inp.addEventListener('paste', () => setTimeout(() => { updateClearBtn(); onMainInput(); }, 50));
     inp.addEventListener('keydown', e => { if (e.key==='Enter') loadFromHome(); });
+    onMainInput(); // Initialisation
+  }
+  
+  refreshAllHistory();
+  
+  // Polling des téléchargements actifs
+  setInterval(refreshDlList, 5000);
+});
+
   }
   await refreshAllHistory();
 });
