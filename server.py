@@ -768,7 +768,7 @@ class Handler(BaseHTTPRequestHandler):
         if not dl: self.json(404, {"error": "Inconnu"}); return
         
         ch = load_custom_headers()
-        # On suppose que les paramètres sont stockés ou on les récupère du dict dl
+        # Correction de l'ordre : dl_id, url, format_id, output_ext, sub_lang, custom_headers, video_title
         dl_manager.add(dl_id, ytdlp_download, dl["url"], "best", "mp4", None, ch or None, dl.get("title"))
         self.json(200, {"ok": True})
 
