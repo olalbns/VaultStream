@@ -9,7 +9,7 @@ Lancer : python server.py
 Deps   : pip install yt-dlp
 """
 
-import json, time, hashlib, threading, re, uuid, os
+import json, time, hashlib, threading, re, uuid, os, subprocess
 import urllib.request, urllib.error, urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
@@ -22,10 +22,22 @@ except ImportError:
     HAS_YTDLP = False
     print("  [WARN] yt-dlp absent — pip install yt-dlp")
 
+def check_ffmpeg():
+    try:
+        subprocess.run(["ffmpeg", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return True
+    except:
+        return False
+
+HAS_FFMPEG = check_ffmpeg()
+if HAS_FFMPEG: print("  [OK] ffmpeg détecté")
+else:          print("  [WARN] ffmpeg absent — transcodage désactivé")
+
 # ── Constantes ──────────────────────────────────────────
-PORT       = 5000
+PORT       = int(os.environ.get("PORT", 5000))
 HOST       = "0.0.0.0"
 CHUNK_SIZE = 1024 * 128
+MAX_CONCURRENT_DOWNLOADS = 2  # Important pour Render Free (RAM limitée)
 
 BASE_DIR         = Path(__file__).parent
 DATA_DIR         = BASE_DIR / "data"
@@ -41,6 +53,40 @@ for d in (DATA_DIR, DL_DIR, COLLECTIONS_DIR):
     d.mkdir(parents=True, exist_ok=True)
 for f, v in [(HISTORY_FILE,"[]"),(HEADERS_FILE,"{}"),(QUEUE_FILE,"[]")]:
     if not f.exists(): f.write_text(v)
+
+# ── Download Manager (Queue & Retry) ────────────────────
+import queue
+
+class DownloadManager:
+    def __init__(self, max_workers=2):
+        self.q = queue.Queue()
+        self.max_workers = max_workers
+        self.workers = []
+        for _ in range(max_workers):
+            t = threading.Thread(target=self._worker, daemon=True)
+            t.start()
+            self.workers.append(t)
+
+    def _worker(self):
+        while True:
+            item = self.q.get()
+            if item is None: break
+            dl_id, func, args = item
+            try:
+                func(dl_id, *args)
+            except Exception as e:
+                print(f"  [QUEUE] Erreur {dl_id}: {e}")
+                with _dl_lock:
+                    if dl_id in _downloads:
+                        _downloads[dl_id]["status"] = "error"
+                        _downloads[dl_id]["error"] = str(e)
+            finally:
+                self.q.task_done()
+
+    def add(self, dl_id, func, *args):
+        self.q.put((dl_id, func, args))
+
+dl_manager = DownloadManager(max_workers=MAX_CONCURRENT_DOWNLOADS)
 
 MIME_MAP = {
     ".mp4":"video/mp4",".webm":"video/webm",".ogv":"video/ogg",
@@ -322,106 +368,134 @@ def ytdlp_playlist(url, custom_headers=None):
         "count": len(items), "items": items,
     }
 
+def ytdlp_search(query, limit=20, custom_headers=None):
+    if not HAS_YTDLP: raise RuntimeError("yt-dlp non installé")
+    opts = {
+        "quiet":True, "no_warnings":True, "extract_flat":True,
+        "playlistend": limit, "noplaylist": True,
+    }
+    if custom_headers: opts["http_headers"] = custom_headers
+    
+    # Utiliser l'extracteur ytsearch
+    search_query = f"ytsearch{limit}:{query}"
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(search_query, download=False)
+    
+    items = []
+    for e in info.get("entries", []):
+        if not e: continue
+        items.append({
+            "id": e.get("id"), "title": e.get("title"),
+            "url": e.get("url") or f"https://www.youtube.com/watch?v={e.get('id')}",
+            "thumbnail": e.get("thumbnail"),
+            "duration": e.get("duration"),
+            "uploader": e.get("uploader"),
+            "view_count": e.get("view_count")
+        })
+    return items
+
 def ytdlp_download(dl_id, url, format_id, output_ext, sub_lang=None,
                    custom_headers=None, video_title=None):
-    """Lance un téléchargement en thread daemon avec suivi de progression."""
+    """Effectue un téléchargement (appelé par le DownloadManager)."""
     with _dl_lock:
-        _downloads[dl_id] = {
-            "id": dl_id, "url": url, "status": "starting",
-            "progress": 0, "speed": "", "eta": "", "size": "",
-            "filename": "", "title": video_title or "", "error": "",
-            "ts": int(time.time()),
-        }
+        if dl_id not in _downloads:
+            _downloads[dl_id] = {
+                "id": dl_id, "url": url, "status": "starting",
+                "progress": 0, "speed": "", "eta": "", "size": "",
+                "filename": "", "title": video_title or "", "error": "",
+                "ts": int(time.time()),
+            }
+        else:
+            _downloads[dl_id].update({"status": "starting", "error": ""})
 
-    def run():
-        # Template de sortie — utilise le titre comme nom de fichier
-        out_tpl = str(DL_DIR / f"{dl_id}.%(ext)s")
+    # Template de sortie — utilise le titre comme nom de fichier
+    out_tpl = str(DL_DIR / f"{dl_id}.%(ext)s")
 
-        def hook(d):
-            with _dl_lock:
-                dl = _downloads.get(dl_id, {})
-                if d["status"] == "downloading":
-                    total   = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
-                    done    = d.get("downloaded_bytes", 0)
-                    pct     = int(done / total * 100) if total else 0
-                    t_info  = d.get("info_dict", {})
-                    dl.update({
-                        "status": "downloading", "progress": pct,
-                        "speed": d.get("_speed_str","").strip(),
-                        "eta":   d.get("_eta_str","").strip(),
-                        "size":  fmt_size(total),
-                        "title": t_info.get("title","") or dl.get("title",""),
-                    })
-                elif d["status"] == "finished":
-                    dl.update({"status": "processing", "progress": 99})
-
-        opts = {
-            "quiet": True, "no_warnings": True, "noplaylist": True,
-            "outtmpl": out_tpl, "progress_hooks": [hook],
-        }
-
-        if format_id == "best":       opts["format"] = "bestvideo+bestaudio/best"
-        elif format_id == "bestaudio": opts["format"] = "bestaudio/best"
-        else:                          opts["format"] = format_id
-
-        if output_ext in ("mp4","mkv","webm"):
-            opts["merge_output_format"] = output_ext
-        elif output_ext in ("mp3","m4a","opus"):
-            opts["postprocessors"] = [{
-                "key": "FFmpegExtractAudio",
-                "preferredcodec": output_ext, "preferredquality": "192",
-            }]
-
-        if sub_lang:
-            opts["writesubtitles"]    = True
-            opts["subtitleslangs"]    = [sub_lang]
-            opts["writeautomaticsub"] = True
-
-        if custom_headers: opts["http_headers"] = custom_headers
-
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-
-            title = (info.get("title","") if info else "") or video_title or ""
-
-            # Trouver le fichier produit (stem = dl_id)
-            filename = ""
-            for fp in DL_DIR.iterdir():
-                if fp.stem == dl_id:
-                    filename = fp.name
-                    break
-
-            # Renommer avec le titre de la vidéo
-            if filename and title:
-                ext_part = Path(filename).suffix.lstrip(".")
-                nice_name = safe_filename(title, ext_part)
-                new_path  = DL_DIR / nice_name
-                # Éviter les collisions
-                if new_path.exists() and new_path != DL_DIR / filename:
-                    base, ext_ = nice_name.rsplit(".",1)
-                    nice_name  = f"{base}_{dl_id[:4]}.{ext_}"
-                    new_path   = DL_DIR / nice_name
-                try:
-                    (DL_DIR / filename).rename(new_path)
-                    filename = nice_name
-                except Exception as rename_err:
-                    print(f"  [DL] Rename impossible : {rename_err}")
-
-            fsize = fmt_size(DL_DIR / filename) if filename else "?"
-            with _dl_lock:
-                _downloads[dl_id].update({
-                    "status": "done", "progress": 100,
-                    "filename": filename, "title": title, "size": fsize,
+    def hook(d):
+        with _dl_lock:
+            dl = _downloads.get(dl_id, {})
+            if d["status"] == "downloading":
+                total   = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+                done    = d.get("downloaded_bytes", 0)
+                pct     = int(done / total * 100) if total else 0
+                t_info  = d.get("info_dict", {})
+                dl.update({
+                    "status": "downloading", "progress": pct,
+                    "speed": d.get("_speed_str","").strip(),
+                    "eta":   d.get("_eta_str","").strip(),
+                    "size":  fmt_size(total),
+                    "title": t_info.get("title","") or dl.get("title",""),
                 })
-            print(f"  [DL] ✓ {dl_id} → {filename}")
+            elif d["status"] == "finished":
+                dl.update({"status": "processing", "progress": 99})
 
-        except Exception as e:
-            with _dl_lock:
-                _downloads[dl_id].update({"status":"error","error":str(e)})
-            print(f"  [DL] ✗ {dl_id} : {e}")
+    opts = {
+        "quiet": True, "no_warnings": True, "noplaylist": True,
+        "outtmpl": out_tpl, "progress_hooks": [hook],
+    }
 
-    threading.Thread(target=run, daemon=True).start()
+    if format_id == "best":       opts["format"] = "bestvideo+bestaudio/best"
+    elif format_id == "bestaudio": opts["format"] = "bestaudio/best"
+    else:                          opts["format"] = format_id
+
+    if output_ext in ("mp4","mkv","webm"):
+        opts["merge_output_format"] = output_ext
+    elif output_ext in ("mp3","m4a","opus"):
+        opts["postprocessors"] = [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": output_ext, "preferredquality": "192",
+        }]
+
+    if sub_lang:
+        opts["writesubtitles"]    = True
+        opts["subtitleslangs"]    = [sub_lang]
+        opts["writeautomaticsub"] = True
+
+    if custom_headers: opts["http_headers"] = custom_headers
+
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+
+        title = (info.get("title","") if info else "") or video_title or ""
+
+        # Trouver le fichier produit (stem = dl_id)
+        filename = ""
+        for fp in DL_DIR.iterdir():
+            if fp.stem == dl_id:
+                filename = fp.name
+                break
+
+        # Renommer avec le titre de la vidéo
+        if filename and title:
+            ext_part = Path(filename).suffix.lstrip(".")
+            nice_name = safe_filename(title, ext_part)
+            new_path  = DL_DIR / nice_name
+            # Éviter les collisions
+            if new_path.exists() and new_path != DL_DIR / filename:
+                base, ext_ = nice_name.rsplit(".",1)
+                nice_name  = f"{base}_{dl_id[:4]}.{ext_}"
+                new_path   = DL_DIR / nice_name
+            try:
+                (DL_DIR / filename).rename(new_path)
+                filename = nice_name
+            except Exception as rename_err:
+                print(f"  [DL] Rename impossible : {rename_err}")
+
+        fsize = fmt_size(DL_DIR / filename) if filename else "?"
+        with _dl_lock:
+            _downloads[dl_id].update({
+                "status": "done", "progress": 100,
+                "filename": filename, "title": title, "size": fsize,
+            })
+        print(f"  [DL] ✓ {dl_id} → {filename}")
+
+    except Exception as e:
+        with _dl_lock:
+            _downloads[dl_id].update({"status":"error","error":str(e)})
+        print(f"  [DL] ✗ {dl_id} : {e}")
+        raise e
+
 
 # ── Collections helpers ─────────────────────────────────
 def list_collections():
@@ -477,6 +551,8 @@ class Handler(BaseHTTPRequestHandler):
             "/api/playlist":         lambda: self._get_playlist(qs),
             "/api/video/info":       lambda: self._video_info(qs),
             "/api/collections":      lambda: self._get_collections(qs),
+            "/api/search":           lambda: self._search(qs),
+            "/api/transcode":        lambda: self._transcode(qs),
         }
         if pt in routes:             routes[pt]()
         elif pt == "/":              self._static(TEMPLATES_DIR/"index.html")
@@ -495,6 +571,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/ytdl/download":         self._ytdl_download,
             "/api/ytdl/download/batch":   self._ytdl_batch,
             "/api/ytdl/cancel":           self._ytdl_cancel,
+            "/api/ytdl/retry":            self._ytdl_retry,
             "/api/queue":                 self._post_queue,
             "/api/collections":           self._post_collections,
         }
@@ -652,8 +729,8 @@ class Handler(BaseHTTPRequestHandler):
         if not url: self.json(400,{"error":"url manquant"}); return
         dl_id = str(uuid.uuid4())[:8]
         ch    = load_custom_headers()
-        ytdlp_download(dl_id, url, format_id, ext, sub_lang, ch or None, title)
-        print(f"  [DL] Démarré {dl_id} fmt={format_id}")
+        dl_manager.add(dl_id, ytdlp_download, url, format_id, ext, sub_lang, ch or None, title)
+        print(f"  [QUEUE] Ajouté {dl_id} fmt={format_id}")
         self.json(200,{"ok":True,"id":dl_id})
 
     # ── /api/ytdl/download/batch ─────────────────────
@@ -669,10 +746,36 @@ class Handler(BaseHTTPRequestHandler):
         ch  = load_custom_headers()
         for url in urls[:50]:
             dl_id = str(uuid.uuid4())[:8]
-            ytdlp_download(dl_id, url, format_id, ext, sub_lang, ch or None)
+            dl_manager.add(dl_id, ytdlp_download, url, format_id, ext, sub_lang, ch or None)
             ids.append(dl_id)
-        print(f"  [BATCH] {len(ids)} DLs")
+        print(f"  [BATCH] {len(ids)} DLs en queue")
         self.json(200,{"ok":True,"ids":ids,"count":len(ids)})
+
+    # ── /api/ytdl/retry ──────────────────────────────
+    def _ytdl_retry(self):
+        b = self.body()
+        if b is None: return
+        dl_id = b.get("id","")
+        with _dl_lock:
+            dl = _downloads.get(dl_id)
+        if not dl: self.json(404, {"error": "Inconnu"}); return
+        
+        ch = load_custom_headers()
+        # On suppose que les paramètres sont stockés ou on les récupère du dict dl
+        dl_manager.add(dl_id, ytdlp_download, dl["url"], "best", "mp4", None, ch or None, dl.get("title"))
+        self.json(200, {"ok": True})
+
+    # ── /api/search ──────────────────────────────────
+    def _search(self, qs):
+        q = qs.get("q", [""])[0]
+        if not q: self.json(400, {"error": "Recherche vide"}); return
+        print(f"  [SEARCH] {q}")
+        try:
+            ch = load_custom_headers()
+            results = ytdlp_search(q, 20, ch or None)
+            self.json(200, {"ok": True, "results": results})
+        except Exception as e:
+            self.json(200, {"ok": False, "error": str(e)})
 
     # ── /api/ytdl/progress ───────────────────────────
     def _ytdl_progress(self, qs):
@@ -942,6 +1045,46 @@ class Handler(BaseHTTPRequestHandler):
         self.json(200,{"ok":True,"count":len(b)})
     def _clear_headers(self):
         HEADERS_FILE.write_text("{}",encoding="utf-8"); self.json(200,{"ok":True})
+
+    # ── /api/transcode ───────────────────────────────
+    def _transcode(self, qs):
+        url_list = qs.get("url",[])
+        if not url_list: self.json(400,{"error":"url manquant"}); return
+        target = urllib.parse.unquote(url_list[0])
+        print(f"  [TRANSCODE] → {target[:80]}")
+
+        if not HAS_FFMPEG:
+            self.send_response(500); self.cors()
+            self.end_headers()
+            self.wfile.write(b"ffmpeg non disponible")
+            return
+
+        # Headers pour le streaming MP4 fragmenté
+        self.send_response(200); self.cors()
+        self.send_header("Content-Type", "video/mp4")
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+
+        # Commande ffmpeg pour sortir du MP4 fragmenté sur stdout
+        cmd = [
+            "ffmpeg", "-re", "-i", target,
+            "-f", "mp4",
+            "-vcodec", "libx264", "-preset", "ultrafast",
+            "-acodec", "aac", "-b:a", "128k",
+            "-movflags", "frag_keyframe+empty_moov+default_base_moof",
+            "pipe:1"
+        ]
+
+        try:
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            while True:
+                chunk = proc.stdout.read(CHUNK_SIZE)
+                if not chunk: break
+                try:    self.wfile.write(chunk)
+                except: break
+            proc.kill()
+        except Exception as e:
+            print(f"  [TRANSCODE] Erreur: {e}")
 
     # ── Static files ──────────────────────────────────
     def _static(self, path: Path):

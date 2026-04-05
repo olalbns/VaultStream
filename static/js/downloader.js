@@ -276,6 +276,9 @@ function renderDlList(data) {
             class="btn-primary" style="font-size:11px;padding:7px 16px;text-decoration:none">↓ Sauvegarder</a>
           <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
             onclick="playDownloaded('${esc(dl.filename)}')">▶ Lire</button>` : ''}
+        ${dl.status==='error' ? `
+          <button class="btn-primary" style="font-size:11px;padding:7px 14px"
+            onclick="retryDl('${dl.id}')">↺ Réessayer</button>` : ''}
         ${dl.status==='downloading' ? `
           <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
             onclick="cancelDl('${dl.id}')">✕ Annuler</button>` : ''}
@@ -293,6 +296,18 @@ async function cancelDl(id) {
     body: JSON.stringify({id}),
   });
   refreshDlList();
+}
+
+async function retryDl(id) {
+  toast('Relance du téléchargement...', '↺');
+  const data = await API.retryDownload(id);
+  if (data.ok) {
+    toast('Relancé !', '✓');
+    trackDownload(id);
+    refreshDlList();
+  } else {
+    toast('Erreur: ' + data.error, '✗');
+  }
 }
 
 function playDownloaded(filename) {

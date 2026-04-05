@@ -67,4 +67,32 @@ const API = {
       });
     } catch {}
   },
+
+  /**
+   * Effectue une recherche globale via yt-dlp
+   */
+  async search(query) {
+    try {
+      const res = await fetch(`${API.BASE}/api/search?q=${encodeURIComponent(query)}`);
+      return await res.json();
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  },
+
+  /**
+   * Réessaye un téléchargement échoué
+   */
+  async retryDownload(id) {
+    try {
+      const res = await fetch(`${API.BASE}/api/ytdl/retry`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      return await res.json();
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  },
 };

@@ -410,6 +410,28 @@ const Player = (() => {
       if(_url && _url.startsWith('http')) loadVfp(_url);
     },
 
+    async transcodeCurrent() {
+      const url = _url;
+      if (!url) return;
+      toast('Lancement du transcodage...', '⚙');
+      spin('Transcodage en cours...');
+      const transcodeUrl = `/api/transcode?url=${encodeURIComponent(url)}`;
+      try {
+        resetVideo();
+        const v = vid();
+        v.src = transcodeUrl;
+        v.load();
+        await waitPlayable(v, 30000);
+        v.play().catch(() => {});
+        _method = 'TRANSCODE (FFMPEG)';
+        setBar(_method, url);
+        unspin();
+        toast('✓ Transcodage actif', '✓');
+      } catch (e) {
+        showErr('Échec du transcodage: ' + e.message);
+      }
+    },
+
     reset() {
       freeBlob(); destroyHls(); vid().pause(); vid().removeAttribute('src'); vid().load();
       vid().style.display='block'; ifr().src=''; ifr().style.display='none';
@@ -514,6 +536,7 @@ function saveDlFile()    { Player.saveDlFile(); }
 function hideDlBar()     { Player.hideDlBar(); }
 function setVfpTab(n,b)  { Player.setVfpTab(n,b); }
 function closeVfp()      { Player.closeVfp(); }
+function transcodeCurrent() { Player.transcodeCurrent(); }
 
 // ── Playlist support ─────────────────────────────────
 window._playlist    = null;

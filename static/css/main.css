@@ -1319,3 +1319,92 @@ body::after {
   .hat-row { flex-direction: column; gap: 4px; }
   .hat-row code { min-width: 0; }
 }
+
+/* ── Search Bar in Nav ── */
+.nav-search {
+  display: flex;
+  align-items: center;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  gap: 8px;
+  margin-left: 20px;
+}
+.nav-search input {
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  width: 150px;
+  transition: width 0.3s;
+}
+.nav-search input:focus { width: 250px; }
+.nav-search button {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ── Responsive Global ── */
+@media (max-width: 1024px) {
+  #navbar { padding: 0 20px; }
+  .nav-links { gap: 15px; }
+  .logo-name { display: none; }
+}
+
+@media (max-width: 768px) {
+  #navbar {
+    height: auto;
+    padding: 10px 15px;
+    flex-direction: column;
+    gap: 10px;
+    position: static;
+  }
+  .nav-left {
+    width: 100%;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .nav-links {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--bg);
+    padding: 10px;
+    justify-content: space-around;
+    border-top: 1px solid var(--border);
+    margin: 0;
+    z-index: 600;
+  }
+  .nav-links li a { font-size: 11px; }
+  .nav-search {
+    width: 100%;
+    margin: 0;
+  }
+  .nav-search input { width: 100%; }
+  .nav-search input:focus { width: 100%; }
+  
+  .hero-title { font-size: 32px; }
+  .hero-sub { font-size: 14px; }
+  .input-row { flex-direction: column; }
+  .btn-primary { width: 100%; }
+  
+  .page { padding-top: 20px; padding-bottom: 80px; }
+  .player-layout { flex-direction: column; }
+}
+
+/* ── Grid for search/library ── */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+  padding: 20px;
+}
+@media (max-width: 480px) {
+  .cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+  }
+}

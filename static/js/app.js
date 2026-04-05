@@ -16,6 +16,82 @@ function showPage(name) {
   if (name === 'downloader')  refreshDlList();
   if (name === 'collections') loadCollections();
   if (name === 'player')      renderSidebarQueue();
+  if (name === 'search')      /* already handled by globalSearch */;
+}
+
+// ── Global Search ──────────────────────────────────────
+async function globalSearch() {
+  const query = document.getElementById('nav-search-input')?.value.trim();
+  if (!query) return;
+
+  showPage('search');
+  document.getElementById('search-query-display').textContent = query;
+  const grid = document.getElementById('search-results-grid');
+  const loader = document.getElementById('search-loading');
+
+  grid.innerHTML = '';
+  loader.style.display = 'block';
+
+  try {
+    const data = await API.search(query);
+    loader.style.display = 'none';
+
+    if (!data.ok) {
+      grid.innerHTML = `<div class="error-msg">Erreur: ${data.error}</div>`;
+      return;
+    }
+
+    if (!data.results?.length) {
+      grid.innerHTML = `<div class="error-msg">Aucun résultat pour "${esc(query)}"</div>`;
+      return;
+    }
+
+    data.results.forEach(v => {
+      const card = document.createElement('div');
+      card.className = 'video-card';
+      const thumb = v.thumbnail
+        ? `<img src="${v.thumbnail}" alt="" loading="lazy">`
+        : `<span class="card-thumb-icon">🎞</span>`;
+      card.innerHTML = `
+        <div class="card-thumb">${thumb}
+          <div class="card-play-hover">
+            <div class="play-circle-sm">
+              <svg viewBox="0 0 24 24" fill="white" width="16" height="16"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="card-title">${esc(v.title)}</div>
+          <div class="card-domain">${esc(v.uploader || 'YouTube')}</div>
+          <div class="card-meta">
+            <span class="card-time">${v.duration ? formatDuration(v.duration) : '?'}</span>
+          </div>
+        </div>`;
+      card.onclick = () => {
+        document.getElementById('main-url-input').value = v.url;
+        loadFromHome();
+      };
+      grid.appendChild(card);
+    });
+  } catch (e) {
+    loader.style.display = 'none';
+    grid.innerHTML = `<div class="error-msg">Une erreur s'est produite.</div>`;
+  }
+}
+
+function formatDuration(sec) {
+  if (!sec) return '';
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = sec % 60;
+  return (h > 0 ? h + ':' : '') + (m < 10 && h > 0 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+function esc(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
 }
 
 function focusInput() {

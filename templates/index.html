@@ -26,8 +26,11 @@
       <li><a href="#" data-page="queue"       onclick="showPage('queue')">Queue</a></li>
       <li><a href="#" data-page="collections" onclick="showPage('collections')">Collections</a></li>
       <li><a href="#" data-page="library"     onclick="showPage('library')">Bibliothèque</a></li>
-      <li><a href="#" data-page="howto"       onclick="showPage('howto')">?</a></li>
     </ul>
+    <div class="nav-search">
+      <input type="text" id="nav-search-input" placeholder="Rechercher..." onkeydown="if(event.key==='Enter')globalSearch()">
+      <button onclick="globalSearch()">🔍</button>
+    </div>
   </div>
   <div class="nav-right">
     <div class="server-status" id="server-status">
@@ -88,6 +91,19 @@
       <a href="#" onclick="showPage('library')" class="see-all">Voir tout →</a>
     </div>
     <div class="cards-row" id="home-cards-row"></div>
+  </div>
+</div>
+
+<!-- ══ SEARCH RESULTS ════════════════════════════════════ -->
+<div id="page-search" class="page">
+  <div class="section-header">
+    <h2 class="section-title">Résultats pour "<span id="search-query-display"></span>"</h2>
+    <button class="btn-ghost" onclick="showPage('home')">✕ Fermer</button>
+  </div>
+  <div class="cards-grid" id="search-results-grid"></div>
+  <div id="search-loading" style="display:none; text-align:center; padding: 40px;">
+    <div class="spinner-ring"></div>
+    <p>Recherche en cours...</p>
   </div>
 </div>
 
@@ -153,6 +169,7 @@
         <div class="method-bar-right">
           <button class="btn-tiny" onclick="copyCurrentUrl()">⎘</button>
           <button class="btn-tiny" onclick="quickDownload()">↓ Télécharger</button>
+          <button class="btn-tiny" onclick="transcodeCurrent()" id="btn-transcode">⚙ Transcoder</button>
         </div>
       </div>
 
