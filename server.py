@@ -282,8 +282,15 @@ def ytdlp_resolve(url, custom_headers=None, referer=None):
 
 def ytdlp_info(url, custom_headers=None):
     if not HAS_YTDLP: raise RuntimeError("yt-dlp non installé")
-    opts = {"quiet":True,"no_warnings":True,"extract_flat":False,"noplaylist":True}
+    opts = {
+        "quiet":True,"no_warnings":True,"extract_flat":False,"noplaylist":True,
+        "nocheckcertificate":True, "ignoreerrors":True, "no_color":True
+    }
     if custom_headers: opts["http_headers"] = custom_headers
+
+    # Ajout d'un User-Agent mobile pour TikTok/Instagram si nécessaire
+    if "tiktok.com" in url or "instagram.com" in url:
+        opts["user_agent"] = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_8 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1"
 
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)

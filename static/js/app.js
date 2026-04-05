@@ -108,20 +108,34 @@ function onMainInput() {
   updateClearBtn();
   const val = document.getElementById('main-url-input').value.trim();
   if (!val) { setHint(''); return; }
-  // Detect JSON
+  
+  // Détection des types de liens
   if (val.startsWith('{') || val.startsWith('[')) {
-    setHint('JSON détecté — StreamVault va extraire les liens automatiquement', 'ok');
-    return;
+    setHint('JSON détecté — Extraction automatique', 'ok'); return;
   }
-  if (val.startsWith('http') && val.includes('.m3u8')) {
-    setHint('Lien HLS/M3U8 détecté — lecture via HLS.js', 'ok'); return;
+  if (val.includes('.m3u8')) {
+    setHint('Lien HLS/M3U8 détecté', 'ok'); return;
   }
-  if (/youtu/.test(val))  { setHint('YouTube détecté', 'ok'); return; }
-  if (/vimeo/.test(val))  { setHint('Vimeo détecté', 'ok');  return; }
+  if (/youtu/.test(val)) {
+    setHint('Lien YouTube détecté', 'ok'); return;
+  }
+  if (/tiktok\.com/.test(val)) {
+    setHint('Vidéo TikTok détectée 📱', 'ok'); return;
+  }
+  if (/instagram\.com/.test(val)) {
+    setHint('Contenu Instagram détecté 📸', 'ok'); return;
+  }
+  if (/twitter\.com|x\.com/.test(val)) {
+    setHint('Vidéo X / Twitter détectée 🐦', 'ok'); return;
+  }
+  if (/facebook\.com|fb\.watch/.test(val)) {
+    setHint('Vidéo Facebook détectée 👥', 'ok'); return;
+  }
+  
   if (val.length > 10 && !val.startsWith('http')) {
     setHint('L\'URL doit commencer par https://', 'error'); return;
   }
-  setHint('');
+  setHint('Lien prêt à être analysé', 'info');
 }
 
 function clearInput() {
