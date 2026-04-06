@@ -400,7 +400,7 @@ async function loadFromHome() {
 
   try {
     showPage('player');
-    document.getElementById('nav-player').style.display = '';
+    document.getElementById('nav-player-li').style.display = 'block';
     // Reset playlist state
     window._playlist = null; window._playlistIdx = -1;
     const pb = document.getElementById('playlist-block');
