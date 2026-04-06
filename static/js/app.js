@@ -163,45 +163,7 @@ function isValidInput(s) {
   try { return /^https?:\/\//.test(new URL(s).href); } catch { return false; }
 }
 
-// ── Load from home ─────────────────────────────────────
-async function loadFromHome() {
-  const url = document.getElementById('main-url-input')?.value.trim();
-  if (!url) { setHint('Colle un lien ou JSON', 'error'); return; }
-  if (!isValidInput(url)) { setHint('URL invalide', 'error'); return; }
-
-  setHint('Chargement…', 'info');
-  const btn = document.getElementById('home-load-btn');
-  if (btn) btn.disabled = true;
-
-  try {
-    showPage('player');
-    const plLi = document.getElementById('nav-player-li');
-    if (plLi) plLi.style.display = 'block';
-    
-    await Player.load(url);
-    setHint('');
-    const sbInp = document.getElementById('sidebar-url-input');
-    if (sbInp) sbInp.value = url;
-    await refreshAllHistory();
-    toast('▶ Lecture démarrée', '✓');
-  } catch {
-    showPage('home');
-    setHint('Impossible de lire. Vérifie le lien.', 'error');
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-
-// ── Load from sidebar ──────────────────────────────────
-async function loadFromSidebar() {
-  const url = document.getElementById('sidebar-url-input')?.value.trim();
-  if (!url || !isValidInput(url)) { toast('Lien invalide', '⚠'); return; }
-  try {
-    await Player.load(url);
-    await refreshAllHistory();
-    toast('▶ Nouvelle vidéo', '✓');
-  } catch { toast('Lecture impossible', '✗'); }
-}
+// ── Load from home – (at bottom of file) ──
 
 function retryLoad() {
   const url = Player.currentUrl;
@@ -405,13 +367,6 @@ setInterval(async () => {
   } catch {}
 }, 2000);
 
-// ── Utils ──────────────────────────────────────────────
-function esc(s) {
-  return String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
 // ── Init ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   const inp = document.getElementById('main-url-input');
@@ -425,10 +380,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Polling des téléchargements actifs
   setInterval(refreshDlList, 5000);
-});
-
-  }
-  await refreshAllHistory();
 });
 
 // ── Playlist auto-detection on load ──────────────────

@@ -494,7 +494,3 @@ function playPlaylistItemDl(idx) {
   document.getElementById('nav-player').style.display = '';
   Player.load(item.url);
 }
-
-function esc(s) {
-  return String(s).replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,"\\'");
-}

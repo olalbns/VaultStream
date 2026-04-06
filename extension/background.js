@@ -8,6 +8,8 @@
  *  4. Les envoie à StreamVault via localhost:5000
  */
 
+/* global chrome */ // Chrome Extension API variable
+
 // ── Configuration ──────────────────────────────────────
 const DEFAULT_SV_URL = "http://localhost:5000";
 
