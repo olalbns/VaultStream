@@ -9,7 +9,7 @@ Lancer : python server.py
 Deps   : pip install yt-dlp
 """
 
-import json, time, hashlib, threading, re, uuid, os, subprocess
+import json, time, hashlib, threading, re, uuid, os, subprocess, base64, binascii
 import urllib.request, urllib.error, urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
@@ -48,10 +48,13 @@ HEADERS_FILE     = DATA_DIR / "custom_headers.json"
 QUEUE_FILE       = DATA_DIR / "queue.json"
 YTDLP_COOKIE_FILE = DATA_DIR / "youtube_cookies.txt"
 YTDLP_ALT_COOKIE_FILE = DATA_DIR / "cookies.txt"
+YTDLP_RUNTIME_COOKIE_FILE = DATA_DIR / "youtube_cookies.runtime.txt"
+YTDLP_CACHE_DIR = DATA_DIR / "yt_dlp_cache"
 STATIC_DIR       = BASE_DIR / "static"
 TEMPLATES_DIR    = BASE_DIR / "templates"
+IS_RENDER = bool(os.environ.get("RENDER") or os.environ.get("RENDER_SERVICE_ID"))
 
-for d in (DATA_DIR, DL_DIR, COLLECTIONS_DIR):
+for d in (DATA_DIR, DL_DIR, COLLECTIONS_DIR, YTDLP_CACHE_DIR):
     d.mkdir(parents=True, exist_ok=True)
 for f, v in [(HISTORY_FILE,"[]"),(HEADERS_FILE,"{}"),(QUEUE_FILE,"[]")]:
     if not f.exists(): f.write_text(v)
@@ -129,6 +132,53 @@ def load_history():        return load_json(HISTORY_FILE, [])
 def load_custom_headers(): return load_json(HEADERS_FILE, {})
 def load_queue():          return load_json(QUEUE_FILE, [])
 
+def _normalize_cookie_text(raw):
+    text = (raw or "").replace("\r\n", "\n").strip()
+    if not text:
+        return ""
+    if text.startswith("# HTTP Cookie File") or text.startswith("# Netscape HTTP Cookie File"):
+        return text + "\n"
+    return ""
+
+def _write_cookie_file(path, text):
+    normalized = _normalize_cookie_text(text)
+    if not normalized:
+        raise ValueError("cookiefile invalide: format Netscape/Mozilla attendu")
+    path.write_text(normalized, encoding="utf-8", newline="\n")
+    return path
+
+def _sync_cookie_file_from_env():
+    inline = (os.environ.get("YTDLP_COOKIE_DATA", "") or "").strip()
+    inline_b64 = (os.environ.get("YTDLP_COOKIE_DATA_B64", "") or "").strip()
+    if inline_b64:
+        try:
+            inline = base64.b64decode(inline_b64).decode("utf-8")
+        except (binascii.Error, UnicodeDecodeError) as e:
+            print(f"  [YTDLP] cookie env base64 invalide: {e}")
+            return None
+    if not inline:
+        return None
+    try:
+        return _write_cookie_file(YTDLP_RUNTIME_COOKIE_FILE, inline)
+    except Exception as e:
+        print(f"  [YTDLP] cookie env ignore: {e}")
+        return None
+
+def _yt_dlp_auth_state():
+    cookiefile = _candidate_cookie_file()
+    browser_spec = _parse_cookies_from_browser(
+        os.environ.get("YTDLP_COOKIES_FROM_BROWSER", "")
+    )
+    return {
+        "render": IS_RENDER,
+        "cookiefile": str(cookiefile) if cookiefile else None,
+        "cookies_from_browser": bool(browser_spec),
+        "cookies_from_browser_value": browser_spec[0] if browser_spec else None,
+        "cookie_env": bool((os.environ.get("YTDLP_COOKIE_DATA", "") or "").strip()
+                           or (os.environ.get("YTDLP_COOKIE_DATA_B64", "") or "").strip()),
+        "custom_cookie_header": bool(load_custom_headers().get("Cookie") or load_custom_headers().get("cookie")),
+    }
+
 def _parse_cookies_from_browser(spec):
     raw = (spec or "").strip()
     if not raw:
@@ -147,7 +197,7 @@ def _parse_cookies_from_browser(spec):
 def _candidate_cookie_file():
     env_path = (os.environ.get("YTDLP_COOKIEFILE", "") or "").strip()
     candidates = [Path(env_path)] if env_path else []
-    candidates.extend([YTDLP_COOKIE_FILE, YTDLP_ALT_COOKIE_FILE])
+    candidates.extend([YTDLP_RUNTIME_COOKIE_FILE, YTDLP_COOKIE_FILE, YTDLP_ALT_COOKIE_FILE])
     for path in candidates:
         try:
             if path and path.exists() and path.is_file():
@@ -161,6 +211,7 @@ def apply_ytdlp_auth(opts, custom_headers=None):
     Applique les vraies sources d'auth pour yt-dlp.
     Priorité: cookiefile > cookies-from-browser.
     """
+    opts["cachedir"] = str(YTDLP_CACHE_DIR)
     cookiefile = _candidate_cookie_file()
     if cookiefile:
         opts["cookiefile"] = str(cookiefile)
@@ -168,12 +219,15 @@ def apply_ytdlp_auth(opts, custom_headers=None):
         browser_spec = _parse_cookies_from_browser(
             os.environ.get("YTDLP_COOKIES_FROM_BROWSER", "")
         )
-        if browser_spec:
+        if browser_spec and not IS_RENDER:
             opts["cookiesfrombrowser"] = browser_spec
 
     if custom_headers:
-        opts["http_headers"] = custom_headers
-        ua = custom_headers.get("User-Agent") or custom_headers.get("user-agent")
+        headers = dict(custom_headers)
+        if cookiefile and any(k.lower() == "cookie" for k in headers):
+            headers = {k: v for k, v in headers.items() if k.lower() != "cookie"}
+        opts["http_headers"] = headers
+        ua = headers.get("User-Agent") or headers.get("user-agent")
         if ua and not opts.get("user_agent"):
             opts["user_agent"] = ua
 
@@ -261,8 +315,8 @@ def is_youtube_cookie_error(err_msg):
 
 def youtube_bot_hint():
     return ("YouTube demande une verification anti-bot. "
-            "Utilise un fichier cookies Netscape recent ou YTDLP_COOKIES_FROM_BROWSER "
-            "avec un navigateur/session encore valides.")
+            "Utilise un fichier cookies Netscape recent, YTDLP_COOKIE_DATA(_B64) sur Render, "
+            "ou YTDLP_COOKIES_FROM_BROWSER en local avec une session encore valide.")
 
 def normalize_youtube_url(url):
     """Normalise les URLs YouTube partagÃ©es vers un format exploitable par yt-dlp."""
@@ -773,6 +827,7 @@ class Handler(BaseHTTPRequestHandler):
             "/api/probe":            lambda: self._probe(qs),
             "/api/history":          self._get_history,
             "/api/headers":          self._get_headers,
+            "/api/ytdl/auth/status": self._get_ytdl_auth_status,
             "/api/intercept/latest": self._intercept_latest,
             "/api/downloads":        self._list_downloads,
             "/api/downloads/file":   lambda: self._serve_dl(qs),
@@ -797,6 +852,8 @@ class Handler(BaseHTTPRequestHandler):
             "/api/history/delete":         self._del_history,
             "/api/headers":               self._save_headers,
             "/api/headers/clear":         self._clear_headers,
+            "/api/ytdl/cookies/save":     self._save_ytdl_cookies,
+            "/api/ytdl/cookies/clear":    self._clear_ytdl_cookies,
             "/api/ytdl/info":             self._ytdl_info,
             "/api/ytdl/download":         self._ytdl_download,
             "/api/ytdl/download/batch":   self._ytdl_batch,
@@ -1308,6 +1365,32 @@ class Handler(BaseHTTPRequestHandler):
     def _clear_headers(self):
         HEADERS_FILE.write_text("{}",encoding="utf-8"); self.json(200,{"ok":True})
 
+    def _get_ytdl_auth_status(self):
+        self.json(200, {"ok": True, **_yt_dlp_auth_state()})
+
+    def _save_ytdl_cookies(self):
+        b = self.body()
+        if b is None: return
+        text = b.get("text", "") if isinstance(b, dict) else ""
+        if not text:
+            self.json(400, {"error": "text manquant"}); return
+        try:
+            path = _write_cookie_file(YTDLP_COOKIE_FILE, text)
+            self.json(200, {"ok": True, "path": str(path), **_yt_dlp_auth_state()})
+        except Exception as e:
+            self.json(400, {"ok": False, "error": str(e)})
+
+    def _clear_ytdl_cookies(self):
+        removed = []
+        for path in (YTDLP_COOKIE_FILE, YTDLP_ALT_COOKIE_FILE, YTDLP_RUNTIME_COOKIE_FILE):
+            try:
+                if path.exists():
+                    path.unlink()
+                    removed.append(str(path))
+            except Exception:
+                pass
+        self.json(200, {"ok": True, "removed": removed, **_yt_dlp_auth_state()})
+
     # â”€â”€ /api/transcode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _transcode(self, qs):
         url_list = qs.get("url",[])
@@ -1383,12 +1466,16 @@ class Handler(BaseHTTPRequestHandler):
 
 # â”€â”€ Entry point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if __name__ == "__main__":
+    _sync_cookie_file_from_env()
     server = HTTPServer((HOST,PORT), Handler)
+    auth = _yt_dlp_auth_state()
     print()
     print("  ================================================")
     print("    StreamVault v5 - Serveur")
     print(f"    yt-dlp : {'OK '+yt_dlp.version.__version__ if HAS_YTDLP else 'MANQUANT (pip install yt-dlp)'}")
     print("    Routes : resolve | proxy | playlist | collections")
+    print(f"    Env    : {'Render' if auth['render'] else 'Local'}")
+    print(f"    Auth   : {'cookiefile' if auth['cookiefile'] else ('browser' if auth['cookies_from_browser'] else 'aucune')}")
     print("  ================================================")
     print(f"\n  URL: http://localhost:{PORT}\n  Stop: Ctrl+C\n")
     try:
