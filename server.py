@@ -46,6 +46,8 @@ COLLECTIONS_DIR  = DATA_DIR / "collections"
 HISTORY_FILE     = DATA_DIR / "history.json"
 HEADERS_FILE     = DATA_DIR / "custom_headers.json"
 QUEUE_FILE       = DATA_DIR / "queue.json"
+YTDLP_COOKIE_FILE = DATA_DIR / "youtube_cookies.txt"
+YTDLP_ALT_COOKIE_FILE = DATA_DIR / "cookies.txt"
 STATIC_DIR       = BASE_DIR / "static"
 TEMPLATES_DIR    = BASE_DIR / "templates"
 
@@ -127,6 +129,54 @@ def load_history():        return load_json(HISTORY_FILE, [])
 def load_custom_headers(): return load_json(HEADERS_FILE, {})
 def load_queue():          return load_json(QUEUE_FILE, [])
 
+def _parse_cookies_from_browser(spec):
+    raw = (spec or "").strip()
+    if not raw:
+        return None
+    m = re.fullmatch(r'''(?x)
+        (?P<name>[^+:]+)
+        (?:\s*\+\s*(?P<keyring>[^:]+))?
+        (?:\s*:\s*(?!:)(?P<profile>.+?))?
+        (?:\s*::\s*(?P<container>.+))?
+    ''', raw)
+    if not m:
+        return None
+    name, keyring, profile, container = m.group("name", "keyring", "profile", "container")
+    return (name.lower(), profile, keyring.upper() if keyring else None, container)
+
+def _candidate_cookie_file():
+    env_path = (os.environ.get("YTDLP_COOKIEFILE", "") or "").strip()
+    candidates = [Path(env_path)] if env_path else []
+    candidates.extend([YTDLP_COOKIE_FILE, YTDLP_ALT_COOKIE_FILE])
+    for path in candidates:
+        try:
+            if path and path.exists() and path.is_file():
+                return path
+        except Exception:
+            continue
+    return None
+
+def apply_ytdlp_auth(opts, custom_headers=None):
+    """
+    Applique les vraies sources d'auth pour yt-dlp.
+    Priorité: cookiefile > cookies-from-browser.
+    """
+    cookiefile = _candidate_cookie_file()
+    if cookiefile:
+        opts["cookiefile"] = str(cookiefile)
+    else:
+        browser_spec = _parse_cookies_from_browser(
+            os.environ.get("YTDLP_COOKIES_FROM_BROWSER", "")
+        )
+        if browser_spec:
+            opts["cookiesfrombrowser"] = browser_spec
+
+    if custom_headers:
+        opts["http_headers"] = custom_headers
+        ua = custom_headers.get("User-Agent") or custom_headers.get("user-agent")
+        if ua and not opts.get("user_agent"):
+            opts["user_agent"] = ua
+
 def fmt_size(x):
     """Accepte un Path, un int, ou None."""
     try:
@@ -199,9 +249,20 @@ def is_youtube_bot_error(err_msg):
     ]
     return any(p in msg for p in probes)
 
+def is_youtube_cookie_error(err_msg):
+    msg = (err_msg or "").lower()
+    probes = [
+        "youtube account cookies are no longer valid",
+        "provided youtube account cookies are no longer valid",
+        "cookies are no longer valid",
+        "login_required",
+    ]
+    return any(p in msg for p in probes)
+
 def youtube_bot_hint():
     return ("YouTube demande une verification anti-bot. "
-            "Reessaie plus tard ou configure des cookies YouTube valides.")
+            "Utilise un fichier cookies Netscape recent ou YTDLP_COOKIES_FROM_BROWSER "
+            "avec un navigateur/session encore valides.")
 
 def normalize_youtube_url(url):
     """Normalise les URLs YouTube partagÃ©es vers un format exploitable par yt-dlp."""
@@ -381,7 +442,7 @@ def ytdlp_resolve(url, custom_headers=None, referer=None):
         "format":"bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
     }
     if referer:        opts["referer"]      = referer
-    if custom_headers: opts["http_headers"] = custom_headers
+    apply_ytdlp_auth(opts, custom_headers)
 
     info = _extract_with_retry(url, opts, for_playlist=False)
     if not info: raise RuntimeError("yt-dlp: aucun rÃ©sultat")
@@ -415,7 +476,7 @@ def ytdlp_info(url, custom_headers=None):
         "quiet":True,"no_warnings":True,"extract_flat":False,"noplaylist":True,
         "nocheckcertificate":True, "ignoreerrors":True, "no_color":True
     }
-    if custom_headers: opts["http_headers"] = custom_headers
+    apply_ytdlp_auth(opts, custom_headers)
 
     # Ajout d'un User-Agent mobile pour TikTok/Instagram si nÃ©cessaire
     if "tiktok.com" in url or "instagram.com" in url:
@@ -476,7 +537,7 @@ def ytdlp_playlist(url, custom_headers=None):
         "quiet":True,"no_warnings":True,
         "extract_flat":"in_playlist","noplaylist":False,"playlistend":200,
     }
-    if custom_headers: opts["http_headers"] = custom_headers
+    apply_ytdlp_auth(opts, custom_headers)
 
     info = _extract_with_retry(url, opts, for_playlist=True)
     if not info: raise RuntimeError("yt-dlp: aucun rÃ©sultat")
@@ -520,7 +581,7 @@ def ytdlp_search(query, limit=20, custom_headers=None):
         "quiet":True, "no_warnings":True, "extract_flat":True,
         "playlistend": limit, "noplaylist": True,
     }
-    if custom_headers: opts["http_headers"] = custom_headers
+    apply_ytdlp_auth(opts, custom_headers)
     
     # Utiliser l'extracteur ytsearch
     search_query = f"ytsearch{limit}:{query}"
@@ -612,8 +673,7 @@ def ytdlp_download(dl_id, url, format_id, output_ext, sub_lang=None,
         opts["subtitleslangs"] = [sub_lang]
         opts["writeautomaticsub"] = True
 
-    if custom_headers:
-        opts["http_headers"] = custom_headers
+    apply_ytdlp_auth(opts, custom_headers)
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
@@ -660,7 +720,7 @@ def ytdlp_download(dl_id, url, format_id, output_ext, sub_lang=None,
             return
 
         err = str(e)
-        if is_youtube_bot_error(err):
+        if is_youtube_cookie_error(err) or is_youtube_bot_error(err):
             err = youtube_bot_hint()
         with _dl_lock:
             _downloads[dl_id].update({"status": "error", "error": err})
