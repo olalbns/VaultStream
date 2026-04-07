@@ -95,4 +95,38 @@ const API = {
       return { ok: false, error: e.message };
     }
   },
+
+  async getYtdlAuthStatus() {
+    try {
+      const res = await fetch(`${API.BASE}/api/ytdl/auth/status`);
+      return await res.json();
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  },
+
+  async saveYtdlCookies(text) {
+    try {
+      const res = await fetch(`${API.BASE}/api/ytdl/cookies/save`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      return await res.json();
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  },
+
+  async clearYtdlCookies() {
+    try {
+      const res = await fetch(`${API.BASE}/api/ytdl/cookies/clear`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      return await res.json();
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  },
 };

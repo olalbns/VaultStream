@@ -898,6 +898,36 @@ body::after {
   content:'';position:absolute;top:0;left:0;right:0;height:1px;
   background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:0.4;
 }
+.auth-card{
+  background:linear-gradient(180deg, rgba(0,207,255,0.05), rgba(255,255,255,0.01));
+  border:1px solid rgba(0,207,255,0.16);
+  border-radius:var(--radius);
+  padding:18px 20px;
+  margin-bottom:24px;
+}
+.auth-card-header{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  margin-bottom:14px;
+}
+.auth-card-title{font-size:18px;font-weight:700;}
+.auth-card-sub{font-size:12px;color:var(--text2);margin-top:4px;max-width:760px;}
+.auth-status-grid{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.auth-status-pill{
+  background:var(--s2);border:1px solid var(--border2);border-radius:999px;
+  padding:6px 10px;font-size:11px;color:var(--text2);
+}
+.auth-status-pill.ok{border-color:rgba(0,230,118,0.3);color:var(--green);}
+.auth-status-pill.warn{border-color:rgba(255,215,64,0.28);color:var(--yellow);}
+.auth-cookie-input{
+  width:100%;min-height:180px;resize:vertical;
+  background:rgba(7,10,16,0.8);color:var(--text);
+  border:1px solid var(--border2);border-radius:var(--radius-sm);
+  padding:12px 14px;font-size:12px;line-height:1.45;
+  font-family:var(--font-mono);outline:none;
+}
+.auth-cookie-input:focus{border-color:rgba(0,207,255,0.35);box-shadow:0 0 0 3px rgba(0,207,255,0.08);}
+.auth-card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.auth-card-help{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5;}
 .dl-info-header{
   display:flex;gap:16px;align-items:flex-start;
   background:var(--s1);border:1px solid var(--border2);

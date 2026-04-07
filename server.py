@@ -169,6 +169,7 @@ def _yt_dlp_auth_state():
     browser_spec = _parse_cookies_from_browser(
         os.environ.get("YTDLP_COOKIES_FROM_BROWSER", "")
     )
+    po_tokens = _read_youtube_po_tokens()
     return {
         "render": IS_RENDER,
         "cookiefile": str(cookiefile) if cookiefile else None,
@@ -177,7 +178,52 @@ def _yt_dlp_auth_state():
         "cookie_env": bool((os.environ.get("YTDLP_COOKIE_DATA", "") or "").strip()
                            or (os.environ.get("YTDLP_COOKIE_DATA_B64", "") or "").strip()),
         "custom_cookie_header": bool(load_custom_headers().get("Cookie") or load_custom_headers().get("cookie")),
+        "visitor_data": bool((os.environ.get("YTDLP_YT_VISITOR_DATA", "") or "").strip()),
+        "po_token_count": len(po_tokens),
+        "po_token_clients": sorted({token.split("+", 1)[0] for token in po_tokens if "+" in token}),
     }
+
+def _split_multi_value(raw):
+    if not raw:
+        return []
+    return [item.strip() for item in re.split(r"[\r\n,;]+", raw) if item.strip()]
+
+def _read_youtube_po_tokens():
+    return _split_multi_value(os.environ.get("YTDLP_YT_PO_TOKENS", "") or os.environ.get("YTDLP_YT_PO_TOKEN", ""))
+
+def _merge_extractor_args(opts, ie_key, values):
+    if not values:
+        return
+    extractor_args = dict(opts.get("extractor_args") or {})
+    ie_args = dict(extractor_args.get(ie_key) or {})
+    for key, value in values.items():
+        if value in (None, "", []):
+            continue
+        ie_args[key] = value
+    extractor_args[ie_key] = ie_args
+    opts["extractor_args"] = extractor_args
+
+def _default_youtube_clients():
+    raw = _split_multi_value(os.environ.get("YTDLP_YT_PLAYER_CLIENTS", ""))
+    if raw:
+        return raw
+    if IS_RENDER:
+        return ["android", "tv", "web"]
+    return ["android", "web"]
+
+def _youtube_extractor_args(include_po_token=True):
+    youtube_args = {
+        "player_client": _default_youtube_clients(),
+        "player_skip": ["configs"],
+    }
+    visitor_data = (os.environ.get("YTDLP_YT_VISITOR_DATA", "") or "").strip()
+    if visitor_data:
+        youtube_args["visitor_data"] = [visitor_data]
+    if include_po_token:
+        po_tokens = _read_youtube_po_tokens()
+        if po_tokens:
+            youtube_args["po_token"] = po_tokens
+    return youtube_args
 
 def _parse_cookies_from_browser(spec):
     raw = (spec or "").strip()
@@ -212,6 +258,7 @@ def apply_ytdlp_auth(opts, custom_headers=None):
     Priorité: cookiefile > cookies-from-browser.
     """
     opts["cachedir"] = str(YTDLP_CACHE_DIR)
+    _merge_extractor_args(opts, "youtube", _youtube_extractor_args())
     cookiefile = _candidate_cookie_file()
     if cookiefile:
         opts["cookiefile"] = str(cookiefile)
@@ -316,7 +363,8 @@ def is_youtube_cookie_error(err_msg):
 def youtube_bot_hint():
     return ("YouTube demande une verification anti-bot. "
             "Utilise un fichier cookies Netscape recent, YTDLP_COOKIE_DATA(_B64) sur Render, "
-            "ou YTDLP_COOKIES_FROM_BROWSER en local avec une session encore valide.")
+            "ou YTDLP_COOKIES_FROM_BROWSER en local avec une session encore valide. "
+            "Si cela bloque encore, ajoute aussi YTDLP_YT_VISITOR_DATA et un YTDLP_YT_PO_TOKEN mweb.gvs+...")
 
 def normalize_youtube_url(url):
     """Normalise les URLs YouTube partagÃ©es vers un format exploitable par yt-dlp."""
@@ -402,16 +450,38 @@ def _extract_with_retry(url, base_opts, for_playlist=False):
 
     # Variante plus tolÃ©rante pour certains liens YouTube (client Android/Web)
     v2 = dict(base_opts)
-    v2["extractor_args"] = {
-        "youtube": {"player_client": ["android", "web"], "player_skip": ["configs"]}
-    }
+    _merge_extractor_args(v2, "youtube", {
+        "player_client": ["android", "web", "tv"],
+        "player_skip": ["configs"],
+    })
     variants.append(v2)
 
-    # Variante de secours supplÃ©mentaire (bypass gÃ©o + aucun color/log)
+    # Variante orientÃ©e YouTube moderne : mweb/web avec visitor_data + po_token si dispo
     v3 = dict(base_opts)
-    v3["geo_bypass"] = True
-    v3["no_color"] = True
+    _merge_extractor_args(v3, "youtube", {
+        "player_client": ["mweb", "web", "android"],
+        "player_skip": ["configs"],
+        **_youtube_extractor_args(include_po_token=True),
+    })
     variants.append(v3)
+
+    # Variante de secours supplÃ©mentaire (clients TV)
+    v4 = dict(base_opts)
+    _merge_extractor_args(v4, "youtube", {
+        "player_client": ["tv", "tv_simply", "web_embedded"],
+        "player_skip": ["configs"],
+    })
+    variants.append(v4)
+
+    # Variante finale : bypass gÃ©o + aucun color/log
+    v5 = dict(base_opts)
+    _merge_extractor_args(v5, "youtube", {
+        "player_client": ["android", "web"],
+        "player_skip": ["configs"],
+    })
+    v5["geo_bypass"] = True
+    v5["no_color"] = True
+    variants.append(v5)
 
     last_err = None
     for opts in variants:

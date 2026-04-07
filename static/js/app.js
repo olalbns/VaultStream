@@ -17,7 +17,7 @@ function showPage(name) {
   if (name === 'library')     renderLibrary();
   if (name === 'home')        renderHomeRecent();
   if (name === 'queue')       loadQueue();
-  if (name === 'downloader')  refreshDlList();
+  if (name === 'downloader')  { refreshDlList(); if (typeof refreshYtdlAuthStatus === 'function') refreshYtdlAuthStatus(); }
   if (name === 'collections') loadCollections();
   if (name === 'player')      renderSidebarQueue();
   if (name === 'search')      /* already handled by globalSearch */;

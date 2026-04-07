@@ -7,6 +7,48 @@ let _dlInfo       = null;
 let _dlUrl        = '';
 let _dlPollTimers = {};
 
+function renderYtdlAuthStatus(data) {
+  const grid = document.getElementById('auth-status-grid');
+  if (!grid) return;
+  if (!data?.ok) {
+    grid.innerHTML = `<div class="auth-status-pill warn">Statut indisponible</div>`;
+    return;
+  }
+  const pills = [
+    { label: data.render ? 'Render' : 'Local', type: data.render ? 'warn' : 'ok' },
+    { label: data.cookiefile ? 'Cookie file actif' : 'Pas de cookie file', type: data.cookiefile ? 'ok' : 'warn' },
+    { label: data.cookies_from_browser ? `Browser: ${data.cookies_from_browser_value}` : 'Browser: off', type: data.cookies_from_browser ? 'ok' : 'warn' },
+    { label: data.visitor_data ? 'Visitor data: ok' : 'Visitor data: absent', type: data.visitor_data ? 'ok' : 'warn' },
+    { label: data.po_token_count ? `PO Tokens: ${data.po_token_count}` : 'PO Token: absent', type: data.po_token_count ? 'ok' : 'warn' },
+  ];
+  grid.innerHTML = pills.map(p => `<div class="auth-status-pill ${p.type}">${esc(p.label)}</div>`).join('');
+}
+
+async function refreshYtdlAuthStatus() {
+  const data = await API.getYtdlAuthStatus();
+  renderYtdlAuthStatus(data);
+  return data;
+}
+
+async function saveYtdlCookiesFromUi() {
+  const textarea = document.getElementById('yt-cookies-input');
+  const text = textarea?.value.trim();
+  if (!text) { toast('Colle un fichier cookies Netscape', '⚠'); return; }
+  const data = await API.saveYtdlCookies(text);
+  if (!data.ok) { toast(`Erreur: ${data.error || '?'}`, '✗'); return; }
+  await refreshYtdlAuthStatus();
+  toast('Cookies sauvegardés', '✓');
+}
+
+async function clearYtdlCookiesFromUi() {
+  const textarea = document.getElementById('yt-cookies-input');
+  const data = await API.clearYtdlCookies();
+  if (!data.ok) { toast(`Erreur: ${data.error || '?'}`, '✗'); return; }
+  if (textarea) textarea.value = '';
+  await refreshYtdlAuthStatus();
+  toast('Cookies supprimés', '✓');
+}
+
 function extractFirstUrl(text) {
   if (!text) return '';
   const raw = String(text).trim();
@@ -336,6 +378,7 @@ function esc(s) {
 // Auto-refresh downloads list on page open
 document.addEventListener('DOMContentLoaded', () => {
   refreshDlList();
+  refreshYtdlAuthStatus();
   setInterval(refreshDlList, 5000);
 });
 
@@ -379,7 +422,8 @@ async function analyzeDl() {
       document.getElementById('dl-playlist-section').style.display = 'block';
       toast(`✓ Playlist : ${plData.count} vidéos`, '✓');
     } else if (infoData?.bot_check) {
-      toast(infoData.error || 'YouTube demande une v?rification anti-bot', '?');
+      await refreshYtdlAuthStatus();
+      toast(infoData.error || 'YouTube demande une vérification anti-bot', '⚠');
     } else if (infoData?.ok) {
       // Single video
       _dlInfo = infoData;
