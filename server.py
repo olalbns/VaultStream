@@ -534,8 +534,11 @@ def ytdlp_download(dl_id, url, format_id, output_ext, sub_lang=None,
             print(f"  [DL] cancelled {dl_id}")
             return
 
+        err = str(e)
+        if is_youtube_bot_error(err):
+            err = youtube_bot_hint()
         with _dl_lock:
-            _downloads[dl_id].update({"status": "error", "error": str(e)})
+            _downloads[dl_id].update({"status": "error", "error": err})
         print(f"  [DL] error {dl_id} : {e}")
         raise e
 
@@ -770,6 +773,8 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── /api/ytdl/download ───────────────────────────
     def _ytdl_download(self):
+        if not HAS_YTDLP:
+            self.json(200,{"ok":False,"error":"yt-dlp non installe"}); return
         b = self.body()
         if b is None: return
         url       = b.get("url","")
@@ -788,6 +793,8 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── /api/ytdl/download/batch ─────────────────────
     def _ytdl_batch(self):
+        if not HAS_YTDLP:
+            self.json(200,{"ok":False,"error":"yt-dlp non installe"}); return
         b = self.body()
         if b is None: return
         urls      = b.get("urls",[])
@@ -808,6 +815,8 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── /api/ytdl/retry ──────────────────────────────
     def _ytdl_retry(self):
+        if not HAS_YTDLP:
+            self.json(200,{"ok":False,"error":"yt-dlp non installe"}); return
         b = self.body()
         if b is None: return
         dl_id = b.get("id","")
@@ -1191,13 +1200,14 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     server = HTTPServer((HOST,PORT), Handler)
     print()
-    print("  ╔══════════════════════════════════════════════╗")
-    print("  ║       StreamVault  v5  —  Serveur            ║")
-    print(f"  ║  yt-dlp  : {'✓ '+yt_dlp.version.__version__ if HAS_YTDLP else '✗ pip install yt-dlp'}{'':>24}║")
-    print("  ║  Routes  : resolve·proxy·playlist·collections║")
-    print("  ╚══════════════════════════════════════════════╝")
-    print(f"\n  ▶  http://localhost:{PORT}\n\n  Arrêter : Ctrl+C\n")
+    print("  ================================================")
+    print("    StreamVault v5 - Serveur")
+    print(f"    yt-dlp : {'OK '+yt_dlp.version.__version__ if HAS_YTDLP else 'MANQUANT (pip install yt-dlp)'}")
+    print("    Routes : resolve | proxy | playlist | collections")
+    print("  ================================================")
+    print(f"\n  URL: http://localhost:{PORT}\n  Stop: Ctrl+C\n")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n  Arrêté."); server.server_close()
+        print("\n  Arrete.")
+        server.server_close()
