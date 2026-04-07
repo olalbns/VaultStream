@@ -1,9 +1,9 @@
-"""
-StreamVault Server v5 — Fichier unique, tout dans la classe Handler.
+﻿"""
+StreamVault Server v5 â€” Fichier unique, tout dans la classe Handler.
 Corrections :
   - h_get_collections / h_post_collections dans la classe (plus de monkey-patching)
-  - fmt_size() corrigé (accepte Path, int ou None)
-  - Nom de fichier téléchargé = titre de la vidéo
+  - fmt_size() corrigÃ© (accepte Path, int ou None)
+  - Nom de fichier tÃ©lÃ©chargÃ© = titre de la vidÃ©o
 
 Lancer : python server.py
 Deps   : pip install yt-dlp
@@ -20,7 +20,7 @@ try:
     print("  [OK] yt-dlp", yt_dlp.version.__version__)
 except ImportError:
     HAS_YTDLP = False
-    print("  [WARN] yt-dlp absent — pip install yt-dlp")
+    print("  [WARN] yt-dlp absent â€” pip install yt-dlp")
 
 def check_ffmpeg():
     try:
@@ -30,14 +30,14 @@ def check_ffmpeg():
         return False
 
 HAS_FFMPEG = check_ffmpeg()
-if HAS_FFMPEG: print("  [OK] ffmpeg détecté")
-else:          print("  [WARN] ffmpeg absent — transcodage désactivé")
+if HAS_FFMPEG: print("  [OK] ffmpeg dÃ©tectÃ©")
+else:          print("  [WARN] ffmpeg absent â€” transcodage dÃ©sactivÃ©")
 
-# ── Constantes ──────────────────────────────────────────
+# â”€â”€ Constantes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 PORT       = int(os.environ.get("PORT", 5000))
 HOST       = "0.0.0.0"
 CHUNK_SIZE = 1024 * 128
-MAX_CONCURRENT_DOWNLOADS = 2  # Important pour Render Free (RAM limitée)
+MAX_CONCURRENT_DOWNLOADS = 2  # Important pour Render Free (RAM limitÃ©e)
 
 BASE_DIR         = Path(__file__).parent
 DATA_DIR         = BASE_DIR / "data"
@@ -54,7 +54,7 @@ for d in (DATA_DIR, DL_DIR, COLLECTIONS_DIR):
 for f, v in [(HISTORY_FILE,"[]"),(HEADERS_FILE,"{}"),(QUEUE_FILE,"[]")]:
     if not f.exists(): f.write_text(v)
 
-# ── Download Manager (Queue & Retry) ────────────────────
+# â”€â”€ Download Manager (Queue & Retry) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import queue
 
 class DownloadManager:
@@ -106,15 +106,15 @@ BROWSER_UA = (
     "Chrome/122.0.0.0 Safari/537.36"
 )
 
-# ── State ───────────────────────────────────────────────
-_downloads  = {}   # dl_id → progress dict
+# â”€â”€ State â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+_downloads  = {}   # dl_id â†’ progress dict
 _dl_lock    = threading.Lock()
 _cancel_events = {}  # dl_id -> threading.Event
 _cache      = {}
 _cache_lock = threading.Lock()
 CACHE_TTL   = 300
 
-# ── Utilitaires globaux ─────────────────────────────────
+# â”€â”€ Utilitaires globaux â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def load_json(path, default):
     try:    return json.loads(Path(path).read_text(encoding="utf-8"))
     except: return default
@@ -145,10 +145,10 @@ def fmt_size(x):
     return f"{b/(1<<30):.2f} Go"
 
 def safe_filename(title, ext="mp4"):
-    """Transforme un titre en nom de fichier sûr."""
+    """Transforme un titre en nom de fichier sÃ»r."""
     if not title:
         return f"video.{ext}"
-    # Enlever les caractères interdits sur Windows/Linux
+    # Enlever les caractÃ¨res interdits sur Windows/Linux
     safe = re.sub(r'[\\/:*?"<>|]', '_', title)
     safe = safe.strip(". ")[:120]   # max 120 chars
     return f"{safe}.{ext}" if safe else f"video.{ext}"
@@ -204,7 +204,7 @@ def youtube_bot_hint():
             "Reessaie plus tard ou configure des cookies YouTube valides.")
 
 def normalize_youtube_url(url):
-    """Normalise les URLs YouTube partagées vers un format exploitable par yt-dlp."""
+    """Normalise les URLs YouTube partagÃ©es vers un format exploitable par yt-dlp."""
     if not url:
         return url
     try:
@@ -250,7 +250,7 @@ def normalize_youtube_url(url):
     return f"https://www.youtube.com/watch?v={video_id}"
 
 def extract_first_url(text):
-    """Extrait la 1ere URL http(s) si l'entrée contient du texte partagé."""
+    """Extrait la 1ere URL http(s) si l'entrÃ©e contient du texte partagÃ©."""
     if not text:
         return text
     raw = str(text).strip()
@@ -258,7 +258,7 @@ def extract_first_url(text):
     return m.group(0).strip("()[]{}<>,.;'\"") if m else raw
 
 def strip_youtube_tracking_params(url):
-    """Enlève les params de tracking qui cassent parfois l'extraction."""
+    """EnlÃ¨ve les params de tracking qui cassent parfois l'extraction."""
     try:
         p = urllib.parse.urlparse(url)
         host = (p.netloc or "").lower().replace("www.", "")
@@ -277,7 +277,46 @@ def strip_youtube_tracking_params(url):
     except Exception:
         return url
 
-# ── API hakunaymatata ───────────────────────────────────
+def _extract_with_retry(url, base_opts, for_playlist=False):
+    """
+    Tente plusieurs variantes yt-dlp pour amÃ©liorer la compatibilitÃ© YouTube
+    sans changer la logique mÃ©tier (mÃªme URL cible, mÃªmes endpoints).
+    """
+    variants = []
+    variants.append(dict(base_opts))
+
+    # Variante plus tolÃ©rante pour certains liens YouTube (client Android/Web)
+    v2 = dict(base_opts)
+    v2["extractor_args"] = {
+        "youtube": {"player_client": ["android", "web"], "player_skip": ["configs"]}
+    }
+    variants.append(v2)
+
+    # Variante de secours supplÃ©mentaire (bypass gÃ©o + aucun color/log)
+    v3 = dict(base_opts)
+    v3["geo_bypass"] = True
+    v3["no_color"] = True
+    variants.append(v3)
+
+    last_err = None
+    for opts in variants:
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+            if info:
+                # Sur certains extracteurs on rÃ©cupÃ¨re un wrapper playlist
+                if (not for_playlist and isinstance(info, dict)
+                    and info.get("entries") and not info.get("formats")):
+                    for entry in (info.get("entries") or []):
+                        if entry:
+                            return entry
+                return info
+        except Exception as e:
+            last_err = e
+    if last_err:
+        raise last_err
+    raise RuntimeError("yt-dlp: aucun rÃ©sultat")
+# â”€â”€ API hakunaymatata â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def api_hakunaymatata(page_url, custom_headers=None):
     parsed   = urllib.parse.urlparse(page_url)
     host     = parsed.netloc
@@ -305,10 +344,10 @@ def api_hakunaymatata(page_url, custom_headers=None):
             dls  = _haku_downloads(data)
             caps = _haku_captions(data)
             if dls:
-                print(f"  [HAKU] ✓ {len(dls)} stream(s)")
+                print(f"  [HAKU] âœ“ {len(dls)} stream(s)")
                 return dls, caps, api_url
         except Exception as e:
-            print(f"  [HAKU] {api_url[:60]} → {e}")
+            print(f"  [HAKU] {api_url[:60]} â†’ {e}")
     raise RuntimeError("API hakunaymatata inaccessible")
 
 def _haku_downloads(data):
@@ -329,9 +368,9 @@ def _haku_captions(data):
     return [{"url":c["url"],"lang":c.get("lan",""),"name":c.get("lanName","")}
             for c in (inner.get("captions",[]) if isinstance(inner,dict) else []) if c.get("url")]
 
-# ── yt-dlp helpers ──────────────────────────────────────
+# â”€â”€ yt-dlp helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def ytdlp_resolve(url, custom_headers=None, referer=None):
-    if not HAS_YTDLP: raise RuntimeError("yt-dlp non installé")
+    if not HAS_YTDLP: raise RuntimeError("yt-dlp non installÃ©")
     url = normalize_youtube_url(strip_youtube_tracking_params(extract_first_url(url)))
     with _cache_lock:
         c = _cache.get("r:"+url)
@@ -344,9 +383,8 @@ def ytdlp_resolve(url, custom_headers=None, referer=None):
     if referer:        opts["referer"]      = referer
     if custom_headers: opts["http_headers"] = custom_headers
 
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-    if not info: raise RuntimeError("yt-dlp: aucun résultat")
+    info = _extract_with_retry(url, opts, for_playlist=False)
+    if not info: raise RuntimeError("yt-dlp: aucun rÃ©sultat")
 
     result_url = info.get("url") or url
     if "formats" in info and info["formats"]:
@@ -367,11 +405,11 @@ def ytdlp_resolve(url, custom_headers=None, referer=None):
         "expires": time.time() + CACHE_TTL,
     }
     with _cache_lock: _cache["r:"+url] = res
-    print(f"  [YTDLP] ✓ → {result_url[:70]}")
+    print(f"  [YTDLP] âœ“ â†’ {result_url[:70]}")
     return res
 
 def ytdlp_info(url, custom_headers=None):
-    if not HAS_YTDLP: raise RuntimeError("yt-dlp non installé")
+    if not HAS_YTDLP: raise RuntimeError("yt-dlp non installÃ©")
     url = normalize_youtube_url(strip_youtube_tracking_params(extract_first_url(url)))
     opts = {
         "quiet":True,"no_warnings":True,"extract_flat":False,"noplaylist":True,
@@ -379,25 +417,24 @@ def ytdlp_info(url, custom_headers=None):
     }
     if custom_headers: opts["http_headers"] = custom_headers
 
-    # Ajout d'un User-Agent mobile pour TikTok/Instagram si nécessaire
+    # Ajout d'un User-Agent mobile pour TikTok/Instagram si nÃ©cessaire
     if "tiktok.com" in url or "instagram.com" in url:
         opts["user_agent"] = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_8 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1"
 
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        try:
-            info = ydl.extract_info(url, download=False)
-        except Exception:
-            # Fallback YouTube: enlever list/index pour forcer analyse vidéo unique
-            clean_url = strip_youtube_tracking_params(url)
-            parsed = urllib.parse.urlparse(clean_url)
-            qs = urllib.parse.parse_qs(parsed.query)
-            if (parsed.netloc.endswith("youtube.com")
-                and parsed.path == "/watch" and qs.get("v")):
-                single = f"https://www.youtube.com/watch?v={qs['v'][0]}"
-                info = ydl.extract_info(single, download=False)
-            else:
-                raise
-    if not info: raise RuntimeError("yt-dlp: aucun résultat")
+    try:
+        info = _extract_with_retry(url, opts, for_playlist=False)
+    except Exception:
+        # Fallback YouTube: enlever list/index pour forcer analyse vidÃ©o unique
+        clean_url = strip_youtube_tracking_params(url)
+        parsed = urllib.parse.urlparse(clean_url)
+        qs = urllib.parse.parse_qs(parsed.query)
+        if (parsed.netloc.endswith("youtube.com")
+            and parsed.path == "/watch" and qs.get("v")):
+            single = f"https://www.youtube.com/watch?v={qs['v'][0]}"
+            info = _extract_with_retry(single, opts, for_playlist=False)
+        else:
+            raise
+    if not info: raise RuntimeError("yt-dlp: aucun rÃ©sultat")
 
     formats = []
     for f in (info.get("formats") or []):
@@ -433,7 +470,7 @@ def ytdlp_info(url, custom_headers=None):
     }
 
 def ytdlp_playlist(url, custom_headers=None):
-    if not HAS_YTDLP: raise RuntimeError("yt-dlp non installé")
+    if not HAS_YTDLP: raise RuntimeError("yt-dlp non installÃ©")
     url = normalize_youtube_url(strip_youtube_tracking_params(extract_first_url(url)))
     opts = {
         "quiet":True,"no_warnings":True,
@@ -441,9 +478,8 @@ def ytdlp_playlist(url, custom_headers=None):
     }
     if custom_headers: opts["http_headers"] = custom_headers
 
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=False)
-    if not info: raise RuntimeError("yt-dlp: aucun résultat")
+    info = _extract_with_retry(url, opts, for_playlist=True)
+    if not info: raise RuntimeError("yt-dlp: aucun rÃ©sultat")
 
     entries = info.get("entries")
     if not entries:
@@ -478,9 +514,8 @@ def ytdlp_playlist(url, custom_headers=None):
         "uploader": info.get("uploader","") or info.get("channel",""),
         "count": len(items), "items": items,
     }
-
 def ytdlp_search(query, limit=20, custom_headers=None):
-    if not HAS_YTDLP: raise RuntimeError("yt-dlp non installé")
+    if not HAS_YTDLP: raise RuntimeError("yt-dlp non installÃ©")
     opts = {
         "quiet":True, "no_warnings":True, "extract_flat":True,
         "playlistend": limit, "noplaylist": True,
@@ -640,7 +675,7 @@ def list_collections():
             d = load_json(f, {})
             cols.append({
                 "id": f.stem, "name": d.get("name","Sans nom"),
-                "color": d.get("color","#e5091a"), "icon": d.get("icon","🎬"),
+                "color": d.get("color","#e5091a"), "icon": d.get("icon","ðŸŽ¬"),
                 "count": len(d.get("items",[])), "created": d.get("created",0),
                 "description": d.get("description",""),
             })
@@ -655,9 +690,9 @@ def save_collection(col_id, data):
     save_json(COLLECTIONS_DIR / f"{col_id}.json", data)
 
 
-# ═══════════════════════════════════════════════════════
-#  HTTP Handler — TOUTES les méthodes dans la classe
-# ═══════════════════════════════════════════════════════
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+#  HTTP Handler â€” TOUTES les mÃ©thodes dans la classe
+# â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 class Handler(BaseHTTPRequestHandler):
 
     def log_message(self, fmt, *args):
@@ -666,7 +701,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
         self.send_response(200); self.cors(); self.end_headers()
 
-    # ── Routing ──────────────────────────────────────
+    # â”€â”€ Routing â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def do_GET(self):
         p  = urllib.parse.urlparse(self.path)
         pt = p.path
@@ -713,7 +748,7 @@ class Handler(BaseHTTPRequestHandler):
         if pt in routes: routes[pt]()
         else:            self.json(404, {"error":"Route inconnue"})
 
-    # ── /api/resolve ─────────────────────────────────
+    # â”€â”€ /api/resolve â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _resolve(self, qs):
         url_list = qs.get("url",[])
         if not url_list: self.json(400,{"error":"url manquant"}); return
@@ -761,15 +796,15 @@ class Handler(BaseHTTPRequestHandler):
         self.json(200,{"ok":False,"method":"direct-fallback",
             "streams":[{"url":url,"proxy_url":pu,"resolution":0,"format":"MP4","size":0}],
             "stream_url":url,"proxy_url":pu,"steps":steps,
-            "error":"Extraction échouée — tentative proxy direct"})
+            "error":"Extraction Ã©chouÃ©e â€” tentative proxy direct"})
 
-    # ── /api/proxy ───────────────────────────────────
+    # â”€â”€ /api/proxy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _proxy(self, qs):
         url_list = qs.get("url",[])
         if not url_list: self.json(400,{"error":"url manquant"}); return
         target  = urllib.parse.unquote(url_list[0])
         referer = urllib.parse.unquote(qs.get("referer",[""])[0]) or None
-        print(f"  [PROXY] → {target[:80]}")
+        print(f"  [PROXY] â†’ {target[:80]}")
 
         headers = build_headers(target, referer)
         if "Range" in self.headers:
@@ -800,14 +835,14 @@ class Handler(BaseHTTPRequestHandler):
                     if not chunk: break
                     try:    self.wfile.write(chunk); sent += len(chunk)
                     except: break
-                print(f"  [PROXY] ✓ {sent:,}b")
+                print(f"  [PROXY] âœ“ {sent:,}b")
 
         except urllib.error.HTTPError as e:
             self.json(e.code, {"error":f"HTTP {e.code} {e.reason}"})
         except Exception as e:
             self.json(502, {"error":str(e)})
 
-    # ── /api/probe ───────────────────────────────────
+    # â”€â”€ /api/probe â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _probe(self, qs):
         url_list = qs.get("url",[])
         if not url_list: self.json(400,{"error":"url manquant"}); return
@@ -827,14 +862,14 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             self.json(200,{"ok":False,"status":0,"error":str(e)})
 
-    # ── /api/playlist ────────────────────────────────
+    # â”€â”€ /api/playlist â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _get_playlist(self, qs):
         url_list = qs.get("url",[])
         if not url_list: self.json(400,{"error":"url manquant"}); return
         url = urllib.parse.unquote(url_list[0])
         print(f"  [PLAYLIST] {url[:80]}")
         if not HAS_YTDLP:
-            self.json(200,{"ok":False,"error":"yt-dlp non installé"}); return
+            self.json(200,{"ok":False,"error":"yt-dlp non installÃ©"}); return
         try:
             ch = load_custom_headers()
             self.json(200,{"ok":True,**ytdlp_playlist(url, ch or None)})
@@ -845,7 +880,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.json(200,{"ok":False,"error":str(e)})
 
-    # ── /api/ytdl/info ───────────────────────────────
+    # â”€â”€ /api/ytdl/info â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _ytdl_info(self):
         b = self.body()
         if b is None: return
@@ -861,7 +896,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.json(200,{"ok":False,"error":str(e)})
 
-    # ── /api/ytdl/download ───────────────────────────
+    # â”€â”€ /api/ytdl/download â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _ytdl_download(self):
         if not HAS_YTDLP:
             self.json(200,{"ok":False,"error":"yt-dlp non installe"}); return
@@ -878,10 +913,10 @@ class Handler(BaseHTTPRequestHandler):
             _cancel_events[dl_id] = threading.Event()
         ch    = load_custom_headers()
         dl_manager.add(dl_id, ytdlp_download, url, format_id, ext, sub_lang, ch or None, title)
-        print(f"  [QUEUE] Ajouté {dl_id} fmt={format_id}")
+        print(f"  [QUEUE] AjoutÃ© {dl_id} fmt={format_id}")
         self.json(200,{"ok":True,"id":dl_id})
 
-    # ── /api/ytdl/download/batch ─────────────────────
+    # â”€â”€ /api/ytdl/download/batch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _ytdl_batch(self):
         if not HAS_YTDLP:
             self.json(200,{"ok":False,"error":"yt-dlp non installe"}); return
@@ -903,7 +938,7 @@ class Handler(BaseHTTPRequestHandler):
         print(f"  [BATCH] {len(ids)} DLs en queue")
         self.json(200,{"ok":True,"ids":ids,"count":len(ids)})
 
-    # ── /api/ytdl/retry ──────────────────────────────
+    # â”€â”€ /api/ytdl/retry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _ytdl_retry(self):
         if not HAS_YTDLP:
             self.json(200,{"ok":False,"error":"yt-dlp non installe"}); return
@@ -926,7 +961,7 @@ class Handler(BaseHTTPRequestHandler):
         dl_manager.add(dl_id, ytdlp_download, dl["url"], "best", "mp4", None, ch or None, dl.get("title"))
         self.json(200, {"ok": True})
 
-    # ── /api/search ──────────────────────────────────
+    # â”€â”€ /api/search â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _search(self, qs):
         q = qs.get("q", [""])[0]
         if not q: self.json(400, {"error": "Recherche vide"}); return
@@ -938,7 +973,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             self.json(200, {"ok": False, "error": str(e)})
 
-    # ── /api/ytdl/progress ───────────────────────────
+    # â”€â”€ /api/ytdl/progress â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _ytdl_progress(self, qs):
         dl_id = qs.get("id",[""])[0]
         with _dl_lock:
@@ -946,7 +981,7 @@ class Handler(BaseHTTPRequestHandler):
         if not dl: self.json(404,{"error":"id inconnu"}); return
         self.json(200, dl)
 
-    # ── /api/ytdl/cancel ────────────────────────────
+    # â”€â”€ /api/ytdl/cancel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _ytdl_cancel(self):
         b = self.body()
         if b is None: return
@@ -961,7 +996,7 @@ class Handler(BaseHTTPRequestHandler):
             if dl: dl["status"] = "cancelled"
         self.json(200,{"ok":True})
 
-    # ── /api/downloads ───────────────────────────────
+    # â”€â”€ /api/downloads â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _list_downloads(self):
         with _dl_lock:
             dls = list(_downloads.values())
@@ -976,7 +1011,7 @@ class Handler(BaseHTTPRequestHandler):
                 })
         self.json(200,{"downloads":dls,"files":files})
 
-    # ── /api/downloads/file ──────────────────────────
+    # â”€â”€ /api/downloads/file â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _serve_dl(self, qs):
         fname = qs.get("f",[""])[0]
         if not fname or ".." in fname or "/" in fname or "\\" in fname:
@@ -1013,7 +1048,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ct)
         self.send_header("Content-Length", str(size))
         self.send_header("Accept-Ranges", "bytes")
-        # Nom de fichier propre pour le téléchargement
+        # Nom de fichier propre pour le tÃ©lÃ©chargement
         safe_fn = fname.encode("ascii","replace").decode()
         self.send_header("Content-Disposition", f'attachment; filename="{safe_fn}"')
         self.end_headers()
@@ -1023,7 +1058,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not chunk: break
                 self.wfile.write(chunk)
 
-    # ── /api/queue ───────────────────────────────────
+    # â”€â”€ /api/queue â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _get_queue(self):
         self.json(200, load_queue())
 
@@ -1054,20 +1089,20 @@ class Handler(BaseHTTPRequestHandler):
         save_json(QUEUE_FILE, queue)
         self.json(200,{"ok":True,"queue":queue})
 
-    # ── /api/video/info — formats+subs for current video ──
+    # â”€â”€ /api/video/info â€” formats+subs for current video â”€â”€
     def _video_info(self, qs):
         url_list = qs.get("url",[])
         if not url_list: self.json(400,{"error":"url manquant"}); return
         url = urllib.parse.unquote(url_list[0])
         if not HAS_YTDLP:
-            self.json(200,{"ok":False,"error":"yt-dlp non installé"}); return
+            self.json(200,{"ok":False,"error":"yt-dlp non installÃ©"}); return
         try:
             ch = load_custom_headers()
             self.json(200,{"ok":True,**ytdlp_info(url, ch or None)})
         except Exception as e:
             self.json(200,{"ok":False,"error":str(e)})
 
-    # ── /api/collections ─────────────────────────────
+    # â”€â”€ /api/collections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _get_collections(self, qs):
         col_id = qs.get("id",[""])[0]
         if col_id:
@@ -1086,7 +1121,7 @@ class Handler(BaseHTTPRequestHandler):
             col_id = str(uuid.uuid4())[:8]
             data = {
                 "id": col_id, "name": b.get("name","Nouvelle collection"),
-                "color": b.get("color","#e5091a"), "icon": b.get("icon","🎬"),
+                "color": b.get("color","#e5091a"), "icon": b.get("icon","ðŸŽ¬"),
                 "description": b.get("description",""),
                 "created": int(time.time()), "items": [],
             }
@@ -1158,7 +1193,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.json(400,{"error":f"Action inconnue: {action}"})
 
-    # ── /api/intercept ───────────────────────────────
+    # â”€â”€ /api/intercept â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _intercept(self):
         b = self.body()
         if b is None: return
@@ -1166,7 +1201,7 @@ class Handler(BaseHTTPRequestHandler):
         headers = b.get("headers",{})
         referer = b.get("referer","")
         if not url: self.json(400,{"error":"url manquant"}); return
-        print(f"  [INTERCEPT] ← {url[:80]}")
+        print(f"  [INTERCEPT] â† {url[:80]}")
         if headers:
             useful   = ["Cookie","cookie","Authorization","authorization",
                         "Referer","referer","Origin","x-token","x-auth","x-session"]
@@ -1190,7 +1225,7 @@ class Handler(BaseHTTPRequestHandler):
             self.json(200, data)
         except: self.json(200,{"url":None})
 
-    # ── History ───────────────────────────────────────
+    # â”€â”€ History â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _get_history(self):   self.json(200, load_history())
     def _post_history(self):
         b = self.body()
@@ -1202,7 +1237,7 @@ class Handler(BaseHTTPRequestHandler):
         save_json(HISTORY_FILE, [e for e in load_history() if e.get("id") != b.get("id")])
         self.json(200,{"ok":True})
 
-    # ── Headers ───────────────────────────────────────
+    # â”€â”€ Headers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _get_headers(self):    self.json(200, load_custom_headers())
     def _save_headers(self):
         b = self.body()
@@ -1213,12 +1248,12 @@ class Handler(BaseHTTPRequestHandler):
     def _clear_headers(self):
         HEADERS_FILE.write_text("{}",encoding="utf-8"); self.json(200,{"ok":True})
 
-    # ── /api/transcode ───────────────────────────────
+    # â”€â”€ /api/transcode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _transcode(self, qs):
         url_list = qs.get("url",[])
         if not url_list: self.json(400,{"error":"url manquant"}); return
         target = urllib.parse.unquote(url_list[0])
-        print(f"  [TRANSCODE] → {target[:80]}")
+        print(f"  [TRANSCODE] â†’ {target[:80]}")
 
         if not HAS_FFMPEG:
             self.send_response(500); self.cors()
@@ -1226,13 +1261,13 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(b"ffmpeg non disponible")
             return
 
-        # Headers pour le streaming MP4 fragmenté
+        # Headers pour le streaming MP4 fragmentÃ©
         self.send_response(200); self.cors()
         self.send_header("Content-Type", "video/mp4")
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
 
-        # Commande ffmpeg pour sortir du MP4 fragmenté sur stdout
+        # Commande ffmpeg pour sortir du MP4 fragmentÃ© sur stdout
         cmd = [
             "ffmpeg", "-re", "-i", target,
             "-f", "mp4",
@@ -1253,7 +1288,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"  [TRANSCODE] Erreur: {e}")
 
-    # ── Static files ──────────────────────────────────
+    # â”€â”€ Static files â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def _static(self, path: Path):
         if not path.exists():
             self.json(404,{"error":f"Introuvable: {path.name}"}); return
@@ -1264,7 +1299,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers(); self.wfile.write(data)
 
-    # ── CORS + JSON helpers ───────────────────────────
+    # â”€â”€ CORS + JSON helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     def cors(self):
         self.send_header("Access-Control-Allow-Origin","*")
         self.send_header("Access-Control-Allow-Methods","GET, POST, OPTIONS")
@@ -1286,7 +1321,7 @@ class Handler(BaseHTTPRequestHandler):
         except: self.json(400,{"error":"JSON invalide"}); return None
 
 
-# ── Entry point ─────────────────────────────────────────
+# â”€â”€ Entry point â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 if __name__ == "__main__":
     server = HTTPServer((HOST,PORT), Handler)
     print()
