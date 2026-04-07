@@ -9,7 +9,7 @@ Lancer : python server.py
 Deps   : pip install yt-dlp
 """
 
-import json, time, hashlib, threading, re, uuid, os, subprocess, base64, binascii
+import json, time, hashlib, threading, re, uuid, os, subprocess, base64, binascii, shutil
 import urllib.request, urllib.error, urllib.parse
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
@@ -50,6 +50,7 @@ YTDLP_COOKIE_FILE = DATA_DIR / "youtube_cookies.txt"
 YTDLP_ALT_COOKIE_FILE = DATA_DIR / "cookies.txt"
 YTDLP_RUNTIME_COOKIE_FILE = DATA_DIR / "youtube_cookies.runtime.txt"
 YTDLP_CACHE_DIR = DATA_DIR / "yt_dlp_cache"
+PUPPETEER_SCRIPT = BASE_DIR / "scripts" / "youtube_puppeteer_resolve.js"
 STATIC_DIR       = BASE_DIR / "static"
 TEMPLATES_DIR    = BASE_DIR / "templates"
 IS_RENDER = bool(os.environ.get("RENDER") or os.environ.get("RENDER_SERVICE_ID"))
@@ -181,6 +182,7 @@ def _yt_dlp_auth_state():
         "visitor_data": bool((os.environ.get("YTDLP_YT_VISITOR_DATA", "") or "").strip()),
         "po_token_count": len(po_tokens),
         "po_token_clients": sorted({token.split("+", 1)[0] for token in po_tokens if "+" in token}),
+        "puppeteer": has_puppeteer_fallback(),
     }
 
 def _split_multi_value(raw):
@@ -365,6 +367,64 @@ def youtube_bot_hint():
             "Utilise un fichier cookies Netscape recent, YTDLP_COOKIE_DATA(_B64) sur Render, "
             "ou YTDLP_COOKIES_FROM_BROWSER en local avec une session encore valide. "
             "Si cela bloque encore, ajoute aussi YTDLP_YT_VISITOR_DATA et un YTDLP_YT_PO_TOKEN mweb.gvs+...")
+
+def has_puppeteer_fallback():
+    return bool(shutil.which("node") and PUPPETEER_SCRIPT.exists())
+
+def run_puppeteer_youtube(url):
+    """
+    Fallback navigateur: ouvre YouTube via Puppeteer, récupère les URLs stream
+    et les headers utiles pour contourner le blocage de l'extracteur YouTube.
+    """
+    if not has_puppeteer_fallback():
+        raise RuntimeError("fallback Puppeteer indisponible")
+
+    cmd = ["node", str(PUPPETEER_SCRIPT), url]
+    proc = subprocess.run(
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        cwd=str(BASE_DIR),
+    )
+    stdout = (proc.stdout or "").strip()
+    stderr = (proc.stderr or "").strip()
+    if proc.returncode != 0:
+        raise RuntimeError(stderr or stdout or "echec Puppeteer")
+
+    payload = None
+    for line in reversed(stdout.splitlines()):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            payload = json.loads(line)
+            break
+        except Exception:
+            continue
+    if not isinstance(payload, dict):
+        raise RuntimeError("reponse Puppeteer invalide")
+    if not payload.get("ok"):
+        raise RuntimeError(payload.get("error") or "Puppeteer n'a rien resolu")
+    return payload
+
+def _puppeteer_stream_to_result(data):
+    streams = data.get("streams") or []
+    best = streams[0] if streams else None
+    stream_url = (best or {}).get("url") or data.get("stream_url")
+    if not stream_url:
+        raise RuntimeError("Puppeteer: aucun stream")
+    headers = data.get("headers") or {}
+    return {
+        "url": stream_url,
+        "title": data.get("title", ""),
+        "ext": (best or {}).get("ext", "mp4"),
+        "thumbnail": data.get("thumbnail", ""),
+        "duration": data.get("duration"),
+        "headers": headers,
+        "streams": streams,
+        "expires": time.time() + CACHE_TTL,
+    }
 
 def normalize_youtube_url(url):
     """Normalise les URLs YouTube partagÃ©es vers un format exploitable par yt-dlp."""
@@ -568,7 +628,16 @@ def ytdlp_resolve(url, custom_headers=None, referer=None):
     if referer:        opts["referer"]      = referer
     apply_ytdlp_auth(opts, custom_headers)
 
-    info = _extract_with_retry(url, opts, for_playlist=False)
+    try:
+        info = _extract_with_retry(url, opts, for_playlist=False)
+    except Exception as e:
+        if is_youtube_cookie_error(str(e)) or is_youtube_bot_error(str(e)):
+            pdata = run_puppeteer_youtube(url)
+            res = _puppeteer_stream_to_result(pdata)
+            with _cache_lock: _cache["r:"+url] = res
+            print(f"  [PUPPETEER] ✓ → {res['url'][:70]}")
+            return res
+        raise
     if not info: raise RuntimeError("yt-dlp: aucun rÃ©sultat")
 
     result_url = info.get("url") or url
@@ -608,7 +677,7 @@ def ytdlp_info(url, custom_headers=None):
 
     try:
         info = _extract_with_retry(url, opts, for_playlist=False)
-    except Exception:
+    except Exception as first_err:
         # Fallback YouTube: enlever list/index pour forcer analyse vidÃ©o unique
         clean_url = strip_youtube_tracking_params(url)
         parsed = urllib.parse.urlparse(clean_url)
@@ -616,8 +685,59 @@ def ytdlp_info(url, custom_headers=None):
         if (parsed.netloc.endswith("youtube.com")
             and parsed.path == "/watch" and qs.get("v")):
             single = f"https://www.youtube.com/watch?v={qs['v'][0]}"
-            info = _extract_with_retry(single, opts, for_playlist=False)
+            try:
+                info = _extract_with_retry(single, opts, for_playlist=False)
+            except Exception as e:
+                if is_youtube_cookie_error(str(e)) or is_youtube_bot_error(str(e)):
+                    pdata = run_puppeteer_youtube(single)
+                    return {
+                        "title": pdata.get("title",""),
+                        "thumbnail": pdata.get("thumbnail",""),
+                        "duration": pdata.get("duration"),
+                        "uploader": pdata.get("uploader",""),
+                        "view_count": pdata.get("view_count"),
+                        "formats": [{
+                            "id": s.get("id","puppeteer"),
+                            "type": "video+audio" if s.get("has_audio", True) and s.get("has_video", True) else "video",
+                            "ext": s.get("ext","mp4"),
+                            "resolution": s.get("resolution") or "auto",
+                            "fps": s.get("fps"),
+                            "vcodec": s.get("vcodec"),
+                            "acodec": s.get("acodec"),
+                            "filesize": s.get("filesize") or 0,
+                            "filesize_str": fmt_size(s.get("filesize") or 0),
+                            "tbr": s.get("tbr"),
+                            "abr": s.get("abr"),
+                            "note": "Puppeteer fallback",
+                        } for s in (pdata.get("streams") or []) if s.get("url")],
+                        "subtitles": [],
+                    }
+                raise
         else:
+            if is_youtube_cookie_error(str(first_err)) or is_youtube_bot_error(str(first_err)):
+                pdata = run_puppeteer_youtube(url)
+                return {
+                    "title": pdata.get("title",""),
+                    "thumbnail": pdata.get("thumbnail",""),
+                    "duration": pdata.get("duration"),
+                    "uploader": pdata.get("uploader",""),
+                    "view_count": pdata.get("view_count"),
+                    "formats": [{
+                        "id": s.get("id","puppeteer"),
+                        "type": "video+audio" if s.get("has_audio", True) and s.get("has_video", True) else "video",
+                        "ext": s.get("ext","mp4"),
+                        "resolution": s.get("resolution") or "auto",
+                        "fps": s.get("fps"),
+                        "vcodec": s.get("vcodec"),
+                        "acodec": s.get("acodec"),
+                        "filesize": s.get("filesize") or 0,
+                        "filesize_str": fmt_size(s.get("filesize") or 0),
+                        "tbr": s.get("tbr"),
+                        "abr": s.get("abr"),
+                        "note": "Puppeteer fallback",
+                    } for s in (pdata.get("streams") or []) if s.get("url")],
+                    "subtitles": [],
+                }
             raise
     if not info: raise RuntimeError("yt-dlp: aucun rÃ©sultat")
 
@@ -844,6 +964,53 @@ def ytdlp_download(dl_id, url, format_id, output_ext, sub_lang=None,
             return
 
         err = str(e)
+        if is_youtube_cookie_error(err) or is_youtube_bot_error(err):
+            try:
+                pdata = run_puppeteer_youtube(url)
+                pbest = (pdata.get("streams") or [{}])[0]
+                pheaders = dict(pdata.get("headers") or {})
+                dl_opts = dict(opts)
+                dl_opts.pop("format", None)
+                dl_opts.pop("cookiefile", None)
+                dl_opts["noplaylist"] = True
+                if pheaders:
+                    dl_opts["http_headers"] = pheaders
+                    ua = pheaders.get("User-Agent") or pheaders.get("user-agent")
+                    if ua:
+                        dl_opts["user_agent"] = ua
+                target_url = pbest.get("url") or pdata.get("stream_url")
+                if target_url:
+                    with yt_dlp.YoutubeDL(dl_opts) as ydl:
+                        info = ydl.extract_info(target_url, download=True)
+                    title = (info.get("title", "") if info else "") or pdata.get("title","") or video_title or ""
+                    filename = ""
+                    for fp in DL_DIR.iterdir():
+                        if fp.stem == dl_id:
+                            filename = fp.name
+                            break
+                    if filename and title:
+                        ext_part = Path(filename).suffix.lstrip(".")
+                        nice_name = safe_filename(title, ext_part)
+                        new_path = DL_DIR / nice_name
+                        if new_path.exists() and new_path != DL_DIR / filename:
+                            base, ext_ = nice_name.rsplit(".", 1)
+                            nice_name = f"{base}_{dl_id[:4]}.{ext_}"
+                            new_path = DL_DIR / nice_name
+                        try:
+                            (DL_DIR / filename).rename(new_path)
+                            filename = nice_name
+                        except Exception:
+                            pass
+                    fsize = fmt_size(DL_DIR / filename) if filename else ""
+                    with _dl_lock:
+                        _downloads[dl_id].update({
+                            "status": "done", "progress": 100,
+                            "filename": filename, "title": title, "size": fsize,
+                        })
+                    print(f"  [DL][PUPPETEER] ok {dl_id} -> {filename}")
+                    return
+            except Exception as p_err:
+                err = f"{youtube_bot_hint()} | Puppeteer: {p_err}"
         if is_youtube_cookie_error(err) or is_youtube_bot_error(err):
             err = youtube_bot_hint()
         with _dl_lock:

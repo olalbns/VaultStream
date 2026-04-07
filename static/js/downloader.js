@@ -16,6 +16,7 @@ function renderYtdlAuthStatus(data) {
   }
   const pills = [
     { label: data.render ? 'Render' : 'Local', type: data.render ? 'warn' : 'ok' },
+    { label: data.puppeteer ? 'Puppeteer: ok' : 'Puppeteer: off', type: data.puppeteer ? 'ok' : 'warn' },
     { label: data.cookiefile ? 'Cookie file actif' : 'Pas de cookie file', type: data.cookiefile ? 'ok' : 'warn' },
     { label: data.cookies_from_browser ? `Browser: ${data.cookies_from_browser_value}` : 'Browser: off', type: data.cookies_from_browser ? 'ok' : 'warn' },
     { label: data.visitor_data ? 'Visitor data: ok' : 'Visitor data: absent', type: data.visitor_data ? 'ok' : 'warn' },
