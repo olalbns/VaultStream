@@ -12,7 +12,7 @@ const API = {
    */
   async probe(url) {
     try {
-      const res = await fetch(`${API.BASE}/api/probeurl=${encodeURIComponent(url)}`);
+      const res = await fetch(`${API.BASE}/api/probe?url=${encodeURIComponent(url)}`);
       return await res.json();
     } catch (e) {
       return { ok: false, status: 0, error: e.message };
@@ -24,7 +24,7 @@ const API = {
    * @returns {string}
    */
   proxyUrl(url) {
-    return `${API.BASE}/api/proxyurl=${encodeURIComponent(url)}`;
+    return `${API.BASE}/api/proxy?url=${encodeURIComponent(url)}`;
   },
 
   /**
@@ -73,7 +73,7 @@ const API = {
    */
   async search(query) {
     try {
-      const res = await fetch(`${API.BASE}/api/searchq=${encodeURIComponent(query)}`);
+      const res = await fetch(`${API.BASE}/api/search?q=${encodeURIComponent(query)}`);
       return await res.json();
     } catch (e) {
       return { ok: false, error: e.message };

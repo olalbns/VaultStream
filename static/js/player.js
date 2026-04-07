@@ -14,28 +14,28 @@ const Player = (() => {
 
   // ── Type detection ──────────────────────────────────
   const typeOf = url => {
-    if (/(:youtube\.com\/watch\v=|youtu\.be\/|youtube\.com\/(:embed|shorts)\/)/i.test(url)) return 'youtube';
-    if (/vimeo\.com\/(:video\/)(\d+)/i.test(url)) return 'vimeo';
-    if (/\.(m3u8)(\|#|$)/i.test(url)) return 'hls';
+    if (/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/(?:embed|shorts)\/)/i.test(url)) return 'youtube';
+    if (/vimeo\.com\/(?:video\/)?(\d+)/i.test(url)) return 'vimeo';
+    if (/\.(m3u8)(\?|#|$)/i.test(url)) return 'hls';
     return 'direct';
   };
-  const ytId = url => { const m=url.match(/(:youtube\.com\/(:watch\v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/); return mm[1]:null; };
-  const vimeoId = url => { const m=url.match(/vimeo\.com\/(:video\/)(\d+)/); return mm[1]:null; };
+  const ytId = url => { const m=url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/); return m?m[1]:null; };
+  const vimeoId = url => { const m=url.match(/vimeo\.com\/(?:video\/)?(\d+)/); return m?m[1]:null; };
 
   function tryParseJson(text) {
     text = text.trim();
     if (!text.startsWith('{') && !text.startsWith('[')) return null;
     try {
       const data = JSON.parse(text);
-      const inner = data.data || data;
-      const downloads = inner.downloads || inner.streams || (Array.isArray(inner)inner:null);
-      if (downloads.length) {
+      const inner = data?.data || data;
+      const downloads = inner?.downloads || inner?.streams || (Array.isArray(inner)?inner:null);
+      if (downloads?.length) {
         const streams = downloads.filter(d=>d.url).map(d=>({
           url:d.url, resolution:d.resolution||0, format:d.format||'MP4',
           size:parseInt(d.size||0), duration:d.duration||0,
-          proxy_url:'/api/proxyurl='+encodeURIComponent(d.url),
+          proxy_url:'/api/proxy?url='+encodeURIComponent(d.url),
         })).sort((a,b)=>b.resolution-a.resolution);
-        const captions=(inner.captions||[]).filter(c=>c.url).map(c=>({
+        const captions=(inner?.captions||[]).filter(c=>c.url).map(c=>({
           url:c.url,lang:c.lan||'',name:c.lanName||c.lan||'',ext:'srt',
         }));
         return {streams, captions};
@@ -54,7 +54,7 @@ const Player = (() => {
   function setBar(method, url) {
     $('method-bar').style.display='flex';
     $('method-chip').textContent=method;
-    $('method-url').textContent=url.length>70url.slice(0,70)+'…':url;
+    $('method-url').textContent=url.length>70?url.slice(0,70)+'…':url;
     $('player-breadcrumb').textContent=(() => {
       try{const u=new URL(url);return u.hostname+u.pathname.slice(0,50);}catch{return url.slice(0,60);}
     })();
@@ -68,7 +68,7 @@ const Player = (() => {
     bar.innerHTML='<span style="font-size:11px;color:var(--muted);font-weight:600;margin-right:4px">Qualité :</span>'+
       streams.map((s,i)=>`<button id="qbtn-${i}" onclick="Player.switchStream(${i})"
         style="background:var(--s3);border:1px solid var(--border2);color:var(--text2);padding:5px 14px;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.15s;font-family:'Syne',sans-serif">
-        ${s.resolutions.resolution+'p':s.format}${s.size` <span style="color:var(--muted);font-weight:400">· ${fmtBytes(s.size)}</span>`:''}
+        ${s.resolution?s.resolution+'p':s.format}${s.size?` <span style="color:var(--muted);font-weight:400">· ${fmtBytes(s.size)}</span>`:''}
       </button>`).join('');
     highlightQ(0);
   }
@@ -76,13 +76,13 @@ const Player = (() => {
   function highlightQ(idx) {
     _streams.forEach((_,i)=>{
       const b=$(`qbtn-${i}`);
-      if(b){b.style.borderColor=i===idx'var(--cyan)':'var(--border2)';b.style.color=i===idx'var(--cyan)':'var(--text2)';}
+      if(b){b.style.borderColor=i===idx?'var(--cyan)':'var(--border2)';b.style.color=i===idx?'var(--cyan)':'var(--text2)';}
     });
   }
 
   function renderSubtitles(captions) {
     const block=$('subs-block'), list=$('subs-list');
-    if(!block||!list||!captions.length){if(block)block.style.display='none';return;}
+    if(!block||!list||!captions?.length){if(block)block.style.display='none';return;}
     block.style.display='block';
     list.innerHTML='<div class="sub-item" onclick="Player.removeSubs()">✕ Aucun</div>'+
       captions.map((c,i)=>`<div class="sub-item" id="sub-${i}" onclick="Player.loadSub('${encodeURIComponent(c.url)}',${i})">
@@ -104,10 +104,10 @@ const Player = (() => {
       let done=false;
       const finish=(s,r)=>{if(done)return;done=true;clearTimeout(t);
         v.removeEventListener('canplay',onOk);v.removeEventListener('loadeddata',onOk);
-        v.removeEventListener('error',onErr);sok():fail(new Error(r));};
+        v.removeEventListener('error',onErr);s?ok():fail(new Error(r));};
       const onOk=()=>finish(true);
       const onErr=()=>{const c={1:'Chargement annulé',2:'Erreur réseau',3:'Format invalide',4:'Non supporté'};
-        finish(false,c[v.error.code]||'Erreur lecteur');};
+        finish(false,c[v.error?.code]||'Erreur lecteur');};
       const t=setTimeout(()=>finish(false,'Timeout'),ms);
       v.addEventListener('canplay',onOk,{once:true});v.addEventListener('loadeddata',onOk,{once:true});
       v.addEventListener('error',onErr,{once:true});
@@ -139,15 +139,12 @@ const Player = (() => {
     pub.diag('info','Méthode 1 — Résolution','API site → yt-dlp → fallback');
     spin('Résolution…','1/4');
     let referer='';try{const u=new URL(url);referer=`${u.protocol}//${u.hostname}/`;}catch{}
-    const res=await fetch(`/api/resolveurl=${encodeURIComponent(url)}&referer=${encodeURIComponent(referer)}`);
+    const res=await fetch(`/api/resolve?url=${encodeURIComponent(url)}&referer=${encodeURIComponent(referer)}`);
     const data=await res.json();
-    if (data.bot_check) {
-      throw new Error(data.error || 'YouTube demande une verification anti-bot.');
-    }
-    pub.diag(data.ok'ok':'warn',`Résolution: ${data.method}`,(data.steps||[]).join(' → '));
+    pub.diag(data.ok?'ok':'warn',`Résolution: ${data.method}`,(data.steps||[]).join(' → '));
     _streams=data.streams||[];
     renderQualityBar(_streams);
-    if(data.captions.length) renderSubtitles(data.captions);
+    if(data.captions?.length) renderSubtitles(data.captions);
     spin('Proxy streaming…','1/4');
     resetVideo();
     const v=vid(); v.src=data.proxy_url; v.load();
@@ -157,13 +154,13 @@ const Player = (() => {
   async function tryProxy(url) {
     pub.diag('info','Méthode 2 — Proxy direct','Relay Python');
     spin('Proxy direct…','2/4'); resetVideo();
-    const v=vid(); v.src=`/api/proxyurl=${encodeURIComponent(url)}`; v.load();
+    const v=vid(); v.src=`/api/proxy?url=${encodeURIComponent(url)}`; v.load();
     await waitPlayable(v,15000); v.play().catch(()=>{}); return 'PROXY DIRECT';
   }
   async function tryBlobProxy(url) {
     pub.diag('info','Méthode 3 — Blob proxy','Téléchargement local');
     spin('Blob…','3/4'); freeBlob();
-    const resp=await fetch(`/api/proxyurl=${encodeURIComponent(url)}`);
+    const resp=await fetch(`/api/proxy?url=${encodeURIComponent(url)}`);
     if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const blob=await resp.blob();
     if(!blob||blob.size<100) throw new Error('Blob vide');
@@ -192,7 +189,7 @@ const Player = (() => {
       const el=$(id); if(el) el.innerHTML='<div class="diag-empty" style="padding:12px">Chargement…</div>';
     });
     try {
-      const res=await fetch(`/api/video/infourl=${encodeURIComponent(url)}`);
+      const res=await fetch(`/api/video/info?url=${encodeURIComponent(url)}`);
       const data=await res.json();
       if(!data.ok) throw new Error(data.error||'Erreur');
       renderVfp(data, url);
@@ -229,10 +226,10 @@ const Player = (() => {
       </div></div>`+audioFmts.map(f=>makeVfpRow(f,originalUrl)).join('');
 
     if($s) $s.innerHTML=subs.length
-      subs.map(s=>`<div class="vfp-row">
+      ?subs.map(s=>`<div class="vfp-row">
           <div class="fmt-badge sub">${s.ext.toUpperCase()}</div>
           <div class="fmt-info"><div class="fmt-res">${esc(s.name||s.lang)}</div>
-          <div class="fmt-detail">${s.lang}${s.auto' · auto':''}</div></div>
+          <div class="fmt-detail">${s.lang}${s.auto?' · auto':''}</div></div>
           <div class="fmt-actions">
             <button class="btn-primary" style="font-size:11px;padding:6px 12px"
               onclick="startDownload('${esc(originalUrl)}','bestaudio','m4a','${s.lang}')">↓ Télécharger</button>
@@ -243,15 +240,15 @@ const Player = (() => {
   }
 
   function makeVfpRow(f, url) {
-    const tc=f.type==='video+audio''both':f.type==='audio''audio':'video';
-    const tl=f.type==='video+audio''V+A':f.type==='audio''AUDIO':'VIDÉO';
-    const detail=[f.ext.toUpperCase(),
-      f.vcodec&&f.vcodec!=='none'f.vcodec.split('.')[0]:null,
-      f.fpsf.fps+'fps':null, f.tbrMath.round(f.tbr)+'kbps':null,
+    const tc=f.type==='video+audio'?'both':f.type==='audio'?'audio':'video';
+    const tl=f.type==='video+audio'?'V+A':f.type==='audio'?'AUDIO':'VIDÉO';
+    const detail=[f.ext?.toUpperCase(),
+      f.vcodec&&f.vcodec!=='none'?f.vcodec.split('.')[0]:null,
+      f.fps?f.fps+'fps':null, f.tbr?Math.round(f.tbr)+'kbps':null,
       f.note||null].filter(Boolean).join(' · ');
     return `<div class="vfp-row">
       <div class="fmt-badge ${tc}">${tl}</div>
-      <div class="fmt-info"><div class="fmt-res">${esc(String(f.resolution||''))}</div>
+      <div class="fmt-info"><div class="fmt-res">${esc(String(f.resolution||'?'))}</div>
       <div class="fmt-detail">${detail}</div></div>
       <span class="fmt-size">${f.filesize_str||''}</span>
       <div class="fmt-actions">
@@ -282,7 +279,7 @@ const Player = (() => {
     _dlBarPoll=setInterval(async()=>{
       if(!_dlBarId){clearInterval(_dlBarPoll);return;}
       try {
-        const res=await fetch(`/api/ytdl/progressid=${_dlBarId}`);
+        const res=await fetch(`/api/ytdl/progress?id=${_dlBarId}`);
         const data=await res.json();
         updateDlBar(data);
         if(data.status==='done'){clearInterval(_dlBarPoll);_dlBarFile=data.filename;showDlBarSave(data.filename,data.title);}
@@ -302,10 +299,10 @@ const Player = (() => {
   }
   function updateDlBar(dl) {
     const title=dl.title||'Téléchargement';
-    $('dl-bar-title').textContent=title.length>50title.slice(0,50)+'…':title;
+    $('dl-bar-title').textContent=title.length>50?title.slice(0,50)+'…':title;
     $('dl-bar-fill').style.width=(dl.progress||0)+'%';
     $('dl-bar-pct').textContent=(dl.progress||0)+'%';
-    $('dl-bar-meta').textContent=[dl.speed,dl.eta'ETA: '+dl.eta:'',dl.size].filter(Boolean).join(' · ');
+    $('dl-bar-meta').textContent=[dl.speed,dl.eta?'ETA: '+dl.eta:'',dl.size].filter(Boolean).join(' · ');
   }
   function showDlBarSave(filename,title) {
     const btn=$('dl-bar-save-btn'); if(btn) btn.style.display='';
@@ -348,11 +345,11 @@ const Player = (() => {
 
     diag(type,title,detail='') {
       const log=$('diag-log'); if(!log) return;
-      log.querySelector('.diag-empty').remove();
+      log.querySelector('.diag-empty')?.remove();
       const el=document.createElement('div'); el.className='diag-entry';
       el.innerHTML=`<div class="diag-tag ${type}">${type.toUpperCase()}</div>
         <div><div class="diag-text">${title}</div>
-        ${detail`<div class="diag-detail">${detail}</div>`:''}</div>`;
+        ${detail?`<div class="diag-detail">${detail}</div>`:''}</div>`;
       log.appendChild(el); log.scrollTop=log.scrollHeight;
     },
     clearDiag() {
@@ -373,7 +370,7 @@ const Player = (() => {
       try {
         const url=decodeURIComponent(encodedUrl);
         const track=document.createElement('track');
-        track.kind='subtitles'; track.src=`/api/proxyurl=${encodeURIComponent(url)}`; track.default=true;
+        track.kind='subtitles'; track.src=`/api/proxy?url=${encodeURIComponent(url)}`; track.default=true;
         vid().innerHTML=''; vid().appendChild(track);
         document.querySelectorAll('.sub-item').forEach((el,i)=>el.classList.toggle('active',i===idx+1));
         toast('Sous-titres chargés','📝');
@@ -390,7 +387,7 @@ const Player = (() => {
     saveDlFile() {
       if(_dlBarFile) {
         const a=document.createElement('a');
-        a.href=`/api/downloads/filef=${encodeURIComponent(_dlBarFile)}`;
+        a.href=`/api/downloads/file?f=${encodeURIComponent(_dlBarFile)}`;
         a.download=_dlBarFile; a.click();
       }
     },
@@ -404,7 +401,7 @@ const Player = (() => {
       document.querySelectorAll('.vfp-tab').forEach(b=>b.classList.remove('active'));
       document.querySelectorAll('.vfp-content').forEach(p=>p.classList.remove('active'));
       btn.classList.add('active');
-      $(`vfp-${name}`).classList.add('active');
+      $(`vfp-${name}`)?.classList.add('active');
     },
     closeVfp() {
       const panel=$('video-formats-panel'); if(panel) panel.style.display='none';
@@ -418,7 +415,7 @@ const Player = (() => {
       if (!url) return;
       toast('Lancement du transcodage...', '⚙');
       spin('Transcodage en cours...');
-      const transcodeUrl = `/api/transcodeurl=${encodeURIComponent(url)}`;
+      const transcodeUrl = `/api/transcode?url=${encodeURIComponent(url)}`;
       try {
         resetVideo();
         const v = vid();
@@ -454,14 +451,14 @@ const Player = (() => {
       const qbar=$('quality-bar'); if(qbar) qbar.style.display='none';
       const sblock=$('subs-block'); if(sblock) sblock.style.display='none';
       const panel=$('video-formats-panel'); if(panel) panel.style.display='none';
-      pub.diag('info','URL',rawUrl.length>80rawUrl.slice(0,80)+'…':rawUrl);
+      pub.diag('info','URL',rawUrl.length>80?rawUrl.slice(0,80)+'…':rawUrl);
 
       const jsonData=tryParseJson(rawUrl);
       if(jsonData) {
         pub.diag('ok','JSON parsé',`${jsonData.streams.length} stream(s)`);
         _streams=jsonData.streams;
         renderQualityBar(_streams);
-        if(jsonData.captions.length) renderSubtitles(jsonData.captions);
+        if(jsonData.captions?.length) renderSubtitles(jsonData.captions);
         const best=_streams[0]; _url=best.url;
         spin('Proxy streaming…'); resetVideo();
         const v=vid(); v.src=best.proxy_url; v.load();
@@ -481,13 +478,13 @@ const Player = (() => {
         if(type==='youtube') {
           const id=ytId(rawUrl); if(!id) throw new Error('ID YouTube invalide');
           pub.diag('info','YouTube embed',`ID: ${id}`);
-          method=loadEmbed(`https://www.youtube-nocookie.com/embed/${id}autoplay=1&rel=0`,'YOUTUBE');
+          method=loadEmbed(`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`,'YOUTUBE');
         } else if(type==='vimeo') {
           const id=vimeoId(rawUrl); if(!id) throw new Error('ID Vimeo invalide');
-          method=loadEmbed(`https://player.vimeo.com/video/${id}autoplay=1`,'VIMEO');
+          method=loadEmbed(`https://player.vimeo.com/video/${id}?autoplay=1`,'VIMEO');
         } else if(type==='hls') {
           spin('HLS…'); resetVideo();
-          try{ method=await loadHls(`/api/proxyurl=${encodeURIComponent(rawUrl)}`); }
+          try{ method=await loadHls(`/api/proxy?url=${encodeURIComponent(rawUrl)}`); }
           catch{ method=await loadHls(rawUrl); }
           pub.diag('ok',`HLS via ${method}`);
         } else {
@@ -555,9 +552,9 @@ async function loadPlaylist(url) {
   list.innerHTML='<div style="padding:14px;text-align:center;font-size:11px;color:var(--muted)">Chargement playlist…</div>';
 
   try {
-    const res=await fetch(`/api/playlisturl=${encodeURIComponent(url)}`);
+    const res=await fetch(`/api/playlist?url=${encodeURIComponent(url)}`);
     const data=await res.json();
-    if(!data.ok||!data.items.length){ block.style.display='none'; return; }
+    if(!data.ok||!data.items?.length){ block.style.display='none'; return; }
 
     window._playlist=data;
     const cnt=document.getElementById('playlist-count');
@@ -578,11 +575,11 @@ async function loadPlaylist(url) {
           onclick="event.stopPropagation();togglePlItem(${i},this.checked)"
           style="flex-shrink:0;accent-color:var(--red)">
         <div class="pl-item-thumb">
-          ${item.thumbnail`<img src="${item.thumbnail}" loading="lazy" onerror="this.style.display='none'">`:''}
+          ${item.thumbnail?`<img src="${item.thumbnail}" loading="lazy" onerror="this.style.display='none'">`:''}
         </div>
         <div class="pl-item-info">
           <div class="pl-item-title">${escHtml(item.title)}</div>
-          <div class="pl-item-dur">${item.durationfmtDur(item.duration):''}</div>
+          <div class="pl-item-dur">${item.duration?fmtDur(item.duration):''}</div>
         </div>
         <div class="pl-item-play">
           <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
@@ -604,18 +601,18 @@ function togglePlSelectAll(checked) {
   document.querySelectorAll('.pl-check').forEach(cb=>cb.checked=checked);
 }
 async function dlSelectedPlaylist() {
-  const items=[...window._plSelected].map(i=>window._playlist.items[i]).filter(Boolean);
+  const items=[...window._plSelected].map(i=>window._playlist?.items[i]).filter(Boolean);
   if(!items.length) return;
   await batchDownload(items.map(i=>i.url));
 }
 
 async function playPlaylistItem(idx) {
-  if(!window._playlist.items.[idx]) return;
+  if(!window._playlist?.items?.[idx]) return;
   window._playlistIdx=idx;
   document.querySelectorAll('.pl-item').forEach((el,i)=>el.classList.toggle('active',i===idx));
   // Scroll into view
   const el=document.getElementById(`pl-${idx}`);
-  el.scrollIntoView({block:'nearest',behavior:'smooth'});
+  el?.scrollIntoView({block:'nearest',behavior:'smooth'});
 
   const item=window._playlist.items[idx];
   Player.diag('info',`Playlist [${idx+1}/${window._playlist.count}]`,item.title);
@@ -633,7 +630,7 @@ function playNextPlaylistItem() {
 }
 
 function updateNextBar(currentIdx) {
-  const next=window._playlist.items.[currentIdx+1];
+  const next=window._playlist?.items?.[currentIdx+1];
   const bar=document.getElementById('next-video-bar');
   const titleEl=document.getElementById('nvb-title');
   if(!bar||!next){ hideNextBar(); return; }
@@ -672,7 +669,7 @@ async function renderSidebarQueue() {
     if(!el) return;
     if(!queue.length){el.innerHTML='<div class="diag-empty">Queue vide.</div>';return;}
     el.innerHTML=queue.map((q,i)=>`
-      <div class="sq-item ${q.played'':''}">
+      <div class="sq-item ${q.played?'':''}">
         <div class="sq-num">${i+1}</div>
         <div class="sq-title" onclick="replayFromHistory('${escHtml(q.url)}')">${escHtml(getDomain(q.url))}</div>
         <button class="sq-del" onclick="removeFromSidebarQueue('${q.id}')">✕</button>
@@ -689,4 +686,4 @@ async function removeFromSidebarQueue(id) {
 function getDomain(url){ try{return new URL(url).hostname.replace('www.','');}catch{return url.slice(0,30);} }
 
 // Refresh sidebar queue periodically when on player page
-setInterval(()=>{ if(document.getElementById('page-player').classList.contains('active')) renderSidebarQueue(); },3000);
+setInterval(()=>{ if(document.getElementById('page-player')?.classList.contains('active')) renderSidebarQueue(); },3000);

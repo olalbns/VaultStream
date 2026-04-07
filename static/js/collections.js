@@ -35,7 +35,7 @@ function renderCollectionGrid() {
     <div class="col-card" onclick="openCollection('${col.id}')">
       <div class="col-card-top" style="background:${col.color}22;border-bottom:2px solid ${col.color}44">
         <span style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">${col.icon||'🎬'}</span>
-        <span class="col-card-count">${col.count} vidéo${col.count!==1's':''}</span>
+        <span class="col-card-count">${col.count} vidéo${col.count!==1?'s':''}</span>
       </div>
       <div class="col-card-body">
         <div class="col-card-name">${esc(col.name)}</div>
@@ -53,7 +53,7 @@ function renderCollectionGrid() {
 // ── Detail view ───────────────────────────────────────
 async function openCollection(id) {
   try {
-    const res = await fetch(`/api/collectionsid=${id}`);
+    const res = await fetch(`/api/collections?id=${id}`);
     _currentCol   = await res.json();
     _currentColId = id;
 
@@ -62,7 +62,7 @@ async function openCollection(id) {
     document.getElementById('col-detail-icon').textContent   = _currentCol.icon || '🎬';
     document.getElementById('col-detail-name').textContent   = _currentCol.name;
     document.getElementById('col-detail-meta').textContent   =
-      `${_currentCol.items.length||0} vidéo${(_currentCol.items.length||0)!==1's':''} · Créée le ${fmtDate(_currentCol.created)}`;
+      `${_currentCol.items?.length||0} vidéo${(_currentCol.items?.length||0)!==1?'s':''} · Créée le ${fmtDate(_currentCol.created)}`;
 
     renderColDetail(_currentCol);
   } catch(e) { toast('Erreur chargement collection','✗'); }
@@ -78,7 +78,7 @@ function closeCollectionDetail() {
 function renderColDetail(col) {
   const grid = document.getElementById('col-detail-grid');
   if (!grid) return;
-  if (!col.items.length) {
+  if (!col.items?.length) {
     grid.innerHTML = `<div class="lib-empty">
       <div class="lib-empty-icon">🎬</div>
       <p>Aucune vidéo dans cette collection</p>
@@ -88,8 +88,8 @@ function renderColDetail(col) {
   grid.innerHTML = col.items.map(item => {
     const ytId = getYtId(item.url);
     const thumb = ytId
-      `<img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" loading="lazy" onerror="this.style.display='none'">`
-      : (item.thumbnail `<img src="${item.thumbnail}" loading="lazy" onerror="this.style.display='none'">` : `<span class="card-thumb-icon">🎞</span>`);
+      ?`<img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" loading="lazy" onerror="this.style.display='none'">`
+      : (item.thumbnail ?`<img src="${item.thumbnail}" loading="lazy" onerror="this.style.display='none'">` : `<span class="card-thumb-icon">🎞</span>`);
     return `
       <div class="video-card" onclick="playFromCollection('${esc(item.url)}')">
         <div class="card-thumb" style="position:relative">
@@ -106,8 +106,8 @@ function renderColDetail(col) {
         <div class="card-body">
           <div class="card-domain">${esc(getDomain(item.url))}</div>
           <div class="card-meta">
-            <span class="card-time">${item.title esc(item.title.slice(0,30)) : ''}</span>
-            ${item.duration `<span class="card-method">${fmtDur(item.duration)}</span>` : ''}
+            <span class="card-time">${item.title ?esc(item.title.slice(0,30)) : ''}</span>
+            ${item.duration ?`<span class="card-method">${fmtDur(item.duration)}</span>` : ''}
           </div>
         </div>
       </div>`;
@@ -116,7 +116,7 @@ function renderColDetail(col) {
 
 async function addToCurrentCollection() {
   const inp = document.getElementById('col-add-url');
-  const url = inp.value.trim();
+  const url = inp?.value.trim();
   if (!url || !_currentColId) return;
 
   let title = url;
@@ -144,7 +144,7 @@ async function playFromCollection(url) {
 }
 
 async function playCollectionAll() {
-  if (!_currentCol.items.length) return;
+  if (!_currentCol?.items?.length) return;
   // Add all to queue then play first
   for (const item of _currentCol.items) {
     await fetch('/api/queue', {
@@ -157,9 +157,9 @@ async function playCollectionAll() {
 }
 
 async function playCollectionById(id) {
-  const res = await fetch(`/api/collectionsid=${id}`);
+  const res = await fetch(`/api/collections?id=${id}`);
   const col = await res.json();
-  if (!col.items.[0]) return;
+  if (!col?.items?.[0]) return;
   showPage('player');
   document.getElementById('nav-player-li').style.display = 'block';
   await Player.load(col.items[0].url);
@@ -167,7 +167,7 @@ async function playCollectionById(id) {
 }
 
 async function addCollectionToQueue() {
-  if (!_currentCol.items.length) return;
+  if (!_currentCol?.items?.length) return;
   for (const item of _currentCol.items) {
     await fetch('/api/queue', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -179,9 +179,9 @@ async function addCollectionToQueue() {
 }
 
 async function addColToQueueById(id) {
-  const res = await fetch(`/api/collectionsid=${id}`);
+  const res = await fetch(`/api/collections?id=${id}`);
   const col = await res.json();
-  if (!col.items.length) return;
+  if (!col?.items?.length) return;
   for (const item of col.items) {
     await fetch('/api/queue', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -193,7 +193,7 @@ async function addColToQueueById(id) {
 }
 
 async function dlCollectionAll() {
-  if (!_currentCol.items.length) return;
+  if (!_currentCol?.items?.length) return;
   const urls = _currentCol.items.map(i => i.url);
   await fetch('/api/ytdl/download/batch', {
     method:'POST', headers:{'Content-Type':'application/json'},
@@ -214,7 +214,7 @@ function openCreateCollection(pendingItems) {
   document.getElementById('col-form-icon').value  = '🎬';
   document.getElementById('col-form-color').value = '#e5091a';
   document.querySelectorAll('.cp-btn').forEach(b => b.classList.remove('active'));
-  document.querySelector('.cp-btn[data-color="#e5091a"]').classList.add('active');
+  document.querySelector('.cp-btn[data-color="#e5091a"]')?.classList.add('active');
   openModal('modal-collection');
 }
 
@@ -224,7 +224,7 @@ function editCollectionModal() {
 }
 
 async function editCollectionById(id) {
-  const res = await fetch(`/api/collectionsid=${id}`);
+  const res = await fetch(`/api/collections?id=${id}`);
   const col = await res.json();
   _editingColId = id;
   document.getElementById('modal-col-title').textContent = 'Modifier la collection';
@@ -260,7 +260,7 @@ async function submitCollectionForm() {
     toast('Collection créée', '✓');
 
     // If we have pending items to add
-    if (_pendingItems.length && data.id) {
+    if (_pendingItems?.length && data.id) {
       await fetch('/api/collections', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ action:'add_items', col_id:data.id, items:_pendingItems }),
@@ -275,14 +275,14 @@ async function submitCollectionForm() {
 }
 
 async function deleteCurrentCollection() {
-  if (!_currentColId || !confirm(`Supprimer "${_currentCol.name}" `)) return;
+  if (!_currentColId || !confirm(`Supprimer "${_currentCol?.name}" ?`)) return;
   await deleteCollectionById(_currentColId);
   closeCollectionDetail();
 }
 
 async function deleteCollectionById(id) {
   const col = _collections.find(c => c.id === id);
-  if (!confirm(`Supprimer "${col.name||id}" `)) return;
+  if (!confirm(`Supprimer "${col?.name||id}" ?`)) return;
   await colAction('delete', { id });
   await loadCollections();
   toast('Collection supprimée', '🗑');
@@ -302,7 +302,7 @@ function openAddToColModal(items) {
         <div class="add-to-col-icon">${col.icon||'🎬'}</div>
         <div class="add-to-col-info">
           <div class="add-to-col-name">${esc(col.name)}</div>
-          <div class="add-to-col-count">${col.count} vidéo${col.count!==1's':''}</div>
+          <div class="add-to-col-count">${col.count} vidéo${col.count!==1?'s':''}</div>
         </div>
       </div>`).join('');
   }
@@ -310,7 +310,7 @@ function openAddToColModal(items) {
 }
 
 async function addItemsToExistingCol(colId) {
-  if (!_pendingItems.length) return;
+  if (!_pendingItems?.length) return;
   const res = await fetch('/api/collections', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ action:'add_items', col_id:colId, items:_pendingItems }),
@@ -334,7 +334,7 @@ async function saveQueueAsCollection() {
 
 // From player playlist panel
 function addPlaylistToCollection() {
-  if (typeof _playlist !== 'undefined' && _playlist.items.length) {
+  if (typeof _playlist !== 'undefined' && _playlist?.items?.length) {
     const items = _playlist.items.map(i => ({ url:i.url, title:i.title }));
     loadCollections().then(() => openAddToColModal(items));
   }
@@ -382,8 +382,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Shared utils ──────────────────────────────────────
 function getYtId(url) {
   try {
-    const m = url.match(/(:youtube\.com\/(:watch\v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-    return m m[1] : null;
+    const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    return m ?m[1] : null;
   } catch { return null; }
 }
 

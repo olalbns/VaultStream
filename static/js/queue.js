@@ -16,7 +16,7 @@ async function loadQueue() {
 
 async function addToQueueManual() {
   const inp = document.getElementById('queue-url-input');
-  const url = inp.value.trim();
+  const url = inp?.value.trim();
   if (!url) return;
   await queueAction('add', { item: { url, title: url } });
   if (inp) inp.value = '';
@@ -53,7 +53,7 @@ async function shuffleQueue() {
 }
 
 async function clearQueue() {
-  if (!confirm('Vider la queue ')) return;
+  if (!confirm('Vider la queue ?')) return;
   await queueAction('clear');
   toast('Queue vidée', '✓');
 }
@@ -102,9 +102,9 @@ function renderQueue() {
   if (empty) empty.style.display = 'none';
 
   list.innerHTML = _queue.map((q, i) => `
-    <div class="queue-item ${q.played 'played' : ''}" id="qi-${q.id}">
+    <div class="queue-item ${q.played ?'played' : ''}" id="qi-${q.id}">
       <div class="qi-num">${i + 1}</div>
-      <div class="qi-icon">${q.played '✓' : '🎞'}</div>
+      <div class="qi-icon">${q.played ?'✓' : '🎞'}</div>
       <div class="qi-info">
         <div class="qi-title">${esc(getDomain(q.url))}</div>
         <div class="qi-url">${esc(q.url)}</div>
@@ -123,7 +123,7 @@ function updateQueueIndicator() {
   const ind = document.getElementById('queue-indicator');
   const cnt = document.getElementById('queue-count');
   if (!ind) return;
-  ind.style.display = pending > 0 'flex' : 'none';
+  ind.style.display = pending > 0 ?'flex' : 'none';
   if (cnt) cnt.textContent = pending;
 }
 
