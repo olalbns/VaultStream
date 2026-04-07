@@ -382,7 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── Shared utils ──────────────────────────────────────
 function getYtId(url) {
   try {
-    const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    const m = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
     return m ?m[1] : null;
   } catch { return null; }
 }

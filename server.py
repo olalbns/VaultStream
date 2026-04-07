@@ -203,6 +203,52 @@ def youtube_bot_hint():
     return ("YouTube demande une verification anti-bot. "
             "Reessaie plus tard ou configure des cookies YouTube valides.")
 
+def normalize_youtube_url(url):
+    """Normalise les URLs YouTube partagées vers un format exploitable par yt-dlp."""
+    if not url:
+        return url
+    try:
+        parsed = urllib.parse.urlparse(url.strip())
+    except Exception:
+        return url
+
+    host = (parsed.netloc or "").lower().replace("www.", "")
+    if host in {"m.youtube.com"}:
+        host = "youtube.com"
+
+    if host not in {"youtube.com", "youtu.be"}:
+        return url
+
+    # Cas particulier: /attribution_link?u=%2Fwatch%3Fv%3D...
+    if host == "youtube.com" and parsed.path == "/attribution_link":
+        qs = urllib.parse.parse_qs(parsed.query)
+        inner = qs.get("u", [""])[0]
+        if inner:
+            try:
+                decoded = urllib.parse.unquote(inner)
+                if decoded.startswith("/"):
+                    decoded = "https://youtube.com" + decoded
+                return normalize_youtube_url(decoded)
+            except Exception:
+                pass
+
+    video_id = ""
+    if host == "youtu.be":
+        video_id = (parsed.path or "").strip("/").split("/")[0]
+    elif parsed.path == "/watch":
+        video_id = urllib.parse.parse_qs(parsed.query).get("v", [""])[0]
+    else:
+        m = re.match(r"^/(?:shorts|live|embed)/([a-zA-Z0-9_-]{11})", parsed.path or "")
+        if m:
+            video_id = m.group(1)
+
+    if not video_id:
+        return url
+    if not re.match(r"^[a-zA-Z0-9_-]{11}$", video_id):
+        return url
+
+    return f"https://www.youtube.com/watch?v={video_id}"
+
 # ── API hakunaymatata ───────────────────────────────────
 def api_hakunaymatata(page_url, custom_headers=None):
     parsed   = urllib.parse.urlparse(page_url)
@@ -258,6 +304,7 @@ def _haku_captions(data):
 # ── yt-dlp helpers ──────────────────────────────────────
 def ytdlp_resolve(url, custom_headers=None, referer=None):
     if not HAS_YTDLP: raise RuntimeError("yt-dlp non installé")
+    url = normalize_youtube_url(url)
     with _cache_lock:
         c = _cache.get("r:"+url)
         if c and time.time() < c.get("expires",0): return c
@@ -297,6 +344,7 @@ def ytdlp_resolve(url, custom_headers=None, referer=None):
 
 def ytdlp_info(url, custom_headers=None):
     if not HAS_YTDLP: raise RuntimeError("yt-dlp non installé")
+    url = normalize_youtube_url(url)
     opts = {
         "quiet":True,"no_warnings":True,"extract_flat":False,"noplaylist":True,
         "nocheckcertificate":True, "ignoreerrors":True, "no_color":True
@@ -346,6 +394,7 @@ def ytdlp_info(url, custom_headers=None):
 
 def ytdlp_playlist(url, custom_headers=None):
     if not HAS_YTDLP: raise RuntimeError("yt-dlp non installé")
+    url = normalize_youtube_url(url)
     opts = {
         "quiet":True,"no_warnings":True,
         "extract_flat":"in_playlist","noplaylist":False,"playlistend":200,
@@ -419,6 +468,7 @@ def ytdlp_search(query, limit=20, custom_headers=None):
 def ytdlp_download(dl_id, url, format_id, output_ext, sub_lang=None,
                    custom_headers=None, video_title=None):
     """Effectue un telechargement (appele par le DownloadManager)."""
+    url = normalize_youtube_url(url)
     with _dl_lock:
         cancel_event = _cancel_events.get(dl_id)
         if cancel_event is None:

@@ -19,6 +19,33 @@ const Player = (() => {
     if (/\.(m3u8)(\?|#|$)/i.test(url)) return 'hls';
     return 'direct';
   };
+  const normalizeYoutubeUrl = input => {
+    if (!input) return input;
+    try {
+      const u = new URL(input.trim());
+      const host = u.hostname.replace('www.', '').replace('m.youtube.com', 'youtube.com');
+      if (host !== 'youtube.com' && host !== 'youtu.be') return input;
+
+      if (host === 'youtube.com' && u.pathname === '/attribution_link') {
+        const inner = u.searchParams.get('u');
+        if (inner) {
+          const decoded = decodeURIComponent(inner);
+          const full = decoded.startsWith('/') ? `https://youtube.com${decoded}` : decoded;
+          return normalizeYoutubeUrl(full);
+        }
+      }
+
+      let id = '';
+      if (host === 'youtu.be') id = u.pathname.split('/').filter(Boolean)[0] || '';
+      else if (u.pathname === '/watch') id = u.searchParams.get('v') || '';
+      else {
+        const m = u.pathname.match(/^\/(?:shorts|live|embed)\/([a-zA-Z0-9_-]{11})/);
+        id = m ? m[1] : '';
+      }
+
+      return /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : input;
+    } catch { return input; }
+  };
   const ytId = url => { const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/); return m ? m[1] : null; };
   const vimeoId = url => { const m = url.match(/vimeo\.com\/(?:video\/)?(\d+)/); return m ? m[1] : null; };
 
@@ -444,6 +471,7 @@ const Player = (() => {
 
     async load(rawUrl) {
       if (!rawUrl) return;
+      rawUrl = normalizeYoutubeUrl(rawUrl);
       _url = rawUrl; _streams = [];
       pub.clearDiag(); showStage(); spin('Analyse…'); hideErr();
       $('method-bar').style.display = 'none';

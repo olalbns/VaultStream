@@ -163,6 +163,39 @@ function isValidInput(s) {
   try { return /^https?:\/\//.test(new URL(s).href); } catch { return false; }
 }
 
+function normalizeYoutubeUrl(url) {
+  if (!url) return url;
+  try {
+    const u = new URL(url.trim());
+    const host = u.hostname.replace('www.', '').replace('m.youtube.com', 'youtube.com');
+    if (host !== 'youtube.com' && host !== 'youtu.be') return url;
+
+    if (host === 'youtube.com' && u.pathname === '/attribution_link') {
+      const inner = u.searchParams.get('u');
+      if (inner) {
+        const decoded = decodeURIComponent(inner);
+        const full = decoded.startsWith('/') ? `https://youtube.com${decoded}` : decoded;
+        return normalizeYoutubeUrl(full);
+      }
+    }
+
+    let id = '';
+    if (host === 'youtu.be') {
+      id = u.pathname.split('/').filter(Boolean)[0] || '';
+    } else if (u.pathname === '/watch') {
+      id = u.searchParams.get('v') || '';
+    } else {
+      const m = u.pathname.match(/^\/(?:shorts|live|embed)\/([a-zA-Z0-9_-]{11})/);
+      id = m ? m[1] : '';
+    }
+
+    if (/^[a-zA-Z0-9_-]{11}$/.test(id)) return `https://www.youtube.com/watch?v=${id}`;
+    return url;
+  } catch {
+    return url;
+  }
+}
+
 // ── Load from home – (at bottom of file) ──
 
 function retryLoad() {
@@ -213,7 +246,7 @@ function getDomain(url) {
 
 function getYtIdFromUrl(url) {
   try {
-    const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    const m = url.match(/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
     return m ?m[1] : null;
   } catch { return null; }
 }
@@ -390,7 +423,8 @@ const _origShowPage = showPage;
 
 // Override loadFromHome to also load playlist
 async function loadFromHome() {
-  const url = document.getElementById('main-url-input')?.value.trim();
+  const rawUrl = document.getElementById('main-url-input')?.value.trim();
+  const url = normalizeYoutubeUrl(rawUrl);
   if (!url) { setHint('Colle un lien ou JSON', 'error'); return; }
   if (!isValidInput(url)) { setHint('URL invalide', 'error'); return; }
 
@@ -437,7 +471,8 @@ async function loadFromHome() {
 }
 
 async function loadFromSidebar() {
-  const url = document.getElementById('sidebar-url-input')?.value.trim();
+  const rawUrl = document.getElementById('sidebar-url-input')?.value.trim();
+  const url = normalizeYoutubeUrl(rawUrl);
   if (!url || !isValidInput(url)) { toast('Lien invalide', '⚠'); return; }
   window._playlist=null; window._playlistIdx=-1;
   hideNextBar();
