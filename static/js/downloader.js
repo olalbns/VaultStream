@@ -7,6 +7,42 @@ let _dlInfo       = null;
 let _dlUrl        = '';
 let _dlPollTimers = {};
 
+function extractFirstUrl(text) {
+  if (!text) return '';
+  const raw = String(text).trim();
+  const m = raw.match(/https?:\/\/[^\s<>"']+/i);
+  return (m ? m[0] : raw).replace(/[)\]}>.,;'"`]+$/g, '');
+}
+
+function normalizeYoutubeDlUrl(url) {
+  if (!url) return url;
+  try {
+    const u = new URL(extractFirstUrl(url));
+    const host = u.hostname.replace('www.', '').replace('m.youtube.com', 'youtube.com');
+    if (host !== 'youtube.com' && host !== 'youtu.be') return u.href;
+
+    if (host === 'youtube.com' && u.pathname === '/attribution_link') {
+      const inner = u.searchParams.get('u');
+      if (inner) {
+        const decoded = decodeURIComponent(inner);
+        const full = decoded.startsWith('/') ? `https://youtube.com${decoded}` : decoded;
+        return normalizeYoutubeDlUrl(full);
+      }
+    }
+
+    let id = '';
+    if (host === 'youtu.be') id = u.pathname.split('/').filter(Boolean)[0] || '';
+    else if (u.pathname === '/watch') id = u.searchParams.get('v') || '';
+    else {
+      const m = u.pathname.match(/^\/(?:shorts|live|embed)\/([a-zA-Z0-9_-]{11})/);
+      id = m ? m[1] : '';
+    }
+    return /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : u.href;
+  } catch {
+    return extractFirstUrl(url);
+  }
+}
+
 function setFmtTab(name, btn) {
   document.querySelectorAll('.fmt-tab').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.fmt-panel').forEach(p => p.classList.remove('active'));
@@ -308,8 +344,10 @@ let _dlPlaylist = null;
 let _selectedItems = new Set();
 
 async function analyzeDl() {
-  const url = document.getElementById('dl-url-input').value.trim();
-  if (!url) { toast('Colle un lien', '⚠'); return; }
+  const raw = document.getElementById('dl-url-input').value.trim();
+  if (!raw) { toast('Colle un lien', '⚠'); return; }
+  const url = normalizeYoutubeDlUrl(raw);
+  document.getElementById('dl-url-input').value = url;
   _dlUrl = url;
 
   const btn = document.getElementById('dl-analyze-btn');

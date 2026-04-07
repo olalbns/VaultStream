@@ -249,6 +249,34 @@ def normalize_youtube_url(url):
 
     return f"https://www.youtube.com/watch?v={video_id}"
 
+def extract_first_url(text):
+    """Extrait la 1ere URL http(s) si l'entrée contient du texte partagé."""
+    if not text:
+        return text
+    raw = str(text).strip()
+    m = re.search(r"https?://[^\s<>\"]+", raw)
+    return m.group(0).strip("()[]{}<>,.;'\"") if m else raw
+
+def strip_youtube_tracking_params(url):
+    """Enlève les params de tracking qui cassent parfois l'extraction."""
+    try:
+        p = urllib.parse.urlparse(url)
+        host = (p.netloc or "").lower().replace("www.", "")
+        if host not in {"youtube.com", "m.youtube.com", "youtu.be"}:
+            return url
+        if p.path != "/watch":
+            return url
+        qs = urllib.parse.parse_qs(p.query)
+        keep = {}
+        for k in ("v", "list", "index", "start"):
+            if qs.get(k):
+                keep[k] = qs[k][0]
+        if not keep.get("v"):
+            return url
+        return "https://www.youtube.com/watch?" + urllib.parse.urlencode(keep)
+    except Exception:
+        return url
+
 # ── API hakunaymatata ───────────────────────────────────
 def api_hakunaymatata(page_url, custom_headers=None):
     parsed   = urllib.parse.urlparse(page_url)
@@ -304,7 +332,7 @@ def _haku_captions(data):
 # ── yt-dlp helpers ──────────────────────────────────────
 def ytdlp_resolve(url, custom_headers=None, referer=None):
     if not HAS_YTDLP: raise RuntimeError("yt-dlp non installé")
-    url = normalize_youtube_url(url)
+    url = normalize_youtube_url(strip_youtube_tracking_params(extract_first_url(url)))
     with _cache_lock:
         c = _cache.get("r:"+url)
         if c and time.time() < c.get("expires",0): return c
@@ -344,7 +372,7 @@ def ytdlp_resolve(url, custom_headers=None, referer=None):
 
 def ytdlp_info(url, custom_headers=None):
     if not HAS_YTDLP: raise RuntimeError("yt-dlp non installé")
-    url = normalize_youtube_url(url)
+    url = normalize_youtube_url(strip_youtube_tracking_params(extract_first_url(url)))
     opts = {
         "quiet":True,"no_warnings":True,"extract_flat":False,"noplaylist":True,
         "nocheckcertificate":True, "ignoreerrors":True, "no_color":True
@@ -356,7 +384,19 @@ def ytdlp_info(url, custom_headers=None):
         opts["user_agent"] = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_8 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1"
 
     with yt_dlp.YoutubeDL(opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+        try:
+            info = ydl.extract_info(url, download=False)
+        except Exception:
+            # Fallback YouTube: enlever list/index pour forcer analyse vidéo unique
+            clean_url = strip_youtube_tracking_params(url)
+            parsed = urllib.parse.urlparse(clean_url)
+            qs = urllib.parse.parse_qs(parsed.query)
+            if (parsed.netloc.endswith("youtube.com")
+                and parsed.path == "/watch" and qs.get("v")):
+                single = f"https://www.youtube.com/watch?v={qs['v'][0]}"
+                info = ydl.extract_info(single, download=False)
+            else:
+                raise
     if not info: raise RuntimeError("yt-dlp: aucun résultat")
 
     formats = []
@@ -394,7 +434,7 @@ def ytdlp_info(url, custom_headers=None):
 
 def ytdlp_playlist(url, custom_headers=None):
     if not HAS_YTDLP: raise RuntimeError("yt-dlp non installé")
-    url = normalize_youtube_url(url)
+    url = normalize_youtube_url(strip_youtube_tracking_params(extract_first_url(url)))
     opts = {
         "quiet":True,"no_warnings":True,
         "extract_flat":"in_playlist","noplaylist":False,"playlistend":200,
@@ -468,7 +508,7 @@ def ytdlp_search(query, limit=20, custom_headers=None):
 def ytdlp_download(dl_id, url, format_id, output_ext, sub_lang=None,
                    custom_headers=None, video_title=None):
     """Effectue un telechargement (appele par le DownloadManager)."""
-    url = normalize_youtube_url(url)
+    url = normalize_youtube_url(strip_youtube_tracking_params(extract_first_url(url)))
     with _dl_lock:
         cancel_event = _cancel_events.get(dl_id)
         if cancel_event is None:
