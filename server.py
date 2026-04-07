@@ -1,5 +1,5 @@
 ﻿"""
-StreamVault Server v5 â€” Fichier unique, tout dans la classe Handler.
+StreamVault Server v8 â€” Fichier unique, tout dans la classe Handler.
 Corrections :
   - h_get_collections / h_post_collections dans la classe (plus de monkey-patching)
   - fmt_size() corrigÃ© (accepte Path, int ou None)
