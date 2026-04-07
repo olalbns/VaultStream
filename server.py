@@ -109,6 +109,7 @@ BROWSER_UA = (
 # ── State ───────────────────────────────────────────────
 _downloads  = {}   # dl_id → progress dict
 _dl_lock    = threading.Lock()
+_cancel_events = {}  # dl_id -> threading.Event
 _cache      = {}
 _cache_lock = threading.Lock()
 CACHE_TTL   = 300
@@ -132,12 +133,12 @@ def fmt_size(x):
         if isinstance(x, Path):
             b = x.stat().st_size if x.exists() else 0
         elif x is None:
-            return "?"
+            return ""
         else:
             b = int(x)
     except:
-        return "?"
-    if b <= 0:    return "?"
+        return ""
+    if b <= 0:    return ""
     if b < 1024:  return f"{b} o"
     if b < 1<<20: return f"{b/1024:.1f} Ko"
     if b < 1<<30: return f"{b/(1<<20):.1f} Mo"
@@ -148,7 +149,7 @@ def safe_filename(title, ext="mp4"):
     if not title:
         return f"video.{ext}"
     # Enlever les caractères interdits sur Windows/Linux
-    safe = re.sub(r'[\\/:*?"<>|]', '_', title)
+    safe = re.sub(r'[\\/:*"<>|]', '_', title)
     safe = safe.strip(". ")[:120]   # max 120 chars
     return f"{safe}.{ext}" if safe else f"video.{ext}"
 
@@ -184,15 +185,29 @@ def build_headers(target_url, referer=None, extra=None):
 
 def mime_from_url(url, fallback="video/mp4"):
     for ext, mime in MIME_MAP.items():
-        if ext in url.lower().split("?")[0] and mime.startswith("video"):
+        if ext in url.lower().split("")[0] and mime.startswith("video"):
             return mime
     return fallback
+
+def is_youtube_bot_error(err_msg):
+    msg = (err_msg or "").lower()
+    probes = [
+        "sign in to confirm you\'re not a bot",
+        "confirm you\'re not a bot",
+        "verify you are human",
+        "unusual traffic",
+    ]
+    return any(p in msg for p in probes)
+
+def youtube_bot_hint():
+    return ("YouTube demande une verification anti-bot. "
+            "Reessaie plus tard ou configure des cookies YouTube valides.")
 
 # ── API hakunaymatata ───────────────────────────────────
 def api_hakunaymatata(page_url, custom_headers=None):
     parsed   = urllib.parse.urlparse(page_url)
     host     = parsed.netloc
-    m        = re.search(r'/(?:watch|video|v|episode|e)/([a-zA-Z0-9_-]+)', parsed.path)
+    m        = re.search(r'/(:watch|video|v|episode|e)/([a-zA-Z0-9_-]+)', parsed.path)
     vid_id   = m.group(1) if m else ([s for s in parsed.path.split('/') if s] or [""])[-1]
     print(f"  [HAKU] ID={vid_id}")
 
@@ -203,10 +218,10 @@ def api_hakunaymatata(page_url, custom_headers=None):
     if custom_headers: base.update(custom_headers)
 
     for api_url in [
-        f"https://{host}/api/resource?id={vid_id}",
-        f"https://{host}/api/video?id={vid_id}",
-        f"https://{host}/api/episode?id={vid_id}",
-        f"https://www.hakunaymatata.com/api/resource?id={vid_id}",
+        f"https://{host}/api/resourceid={vid_id}",
+        f"https://{host}/api/videoid={vid_id}",
+        f"https://{host}/api/episodeid={vid_id}",
+        f"https://www.hakunaymatata.com/api/resourceid={vid_id}",
     ]:
         try:
             with urllib.request.urlopen(
@@ -306,7 +321,7 @@ def ytdlp_info(url, custom_headers=None):
         elif has_a:           ftype = "audio"
         else:                 continue
         formats.append({
-            "id": f.get("format_id",""), "type": ftype, "ext": f.get("ext","?"),
+            "id": f.get("format_id",""), "type": ftype, "ext": f.get("ext",""),
             "resolution": f.get("resolution") or (f"{f.get('height',0)}p" if f.get("height") else "audio"),
             "fps": f.get("fps"), "vcodec": vcodec if has_v else None,
             "acodec": acodec if has_a else None,
@@ -358,7 +373,7 @@ def ytdlp_playlist(url, custom_headers=None):
         if not e: continue
         vid_url = e.get("url") or e.get("webpage_url","")
         if not vid_url and e.get("id"):
-            vid_url = f"https://www.youtube.com/watch?v={e['id']}"
+            vid_url = f"https://www.youtube.com/watchv={e['id']}"
         if not vid_url: continue
         items.append({
             "id": e.get("id",""), "title": e.get("title","Sans titre"),
@@ -393,7 +408,7 @@ def ytdlp_search(query, limit=20, custom_headers=None):
         if not e: continue
         items.append({
             "id": e.get("id"), "title": e.get("title"),
-            "url": e.get("url") or f"https://www.youtube.com/watch?v={e.get('id')}",
+            "url": e.get("url") or f"https://www.youtube.com/watchv={e.get('id')}",
             "thumbnail": e.get("thumbnail"),
             "duration": e.get("duration"),
             "uploader": e.get("uploader"),
@@ -403,8 +418,13 @@ def ytdlp_search(query, limit=20, custom_headers=None):
 
 def ytdlp_download(dl_id, url, format_id, output_ext, sub_lang=None,
                    custom_headers=None, video_title=None):
-    """Effectue un téléchargement (appelé par le DownloadManager)."""
+    """Effectue un telechargement (appele par le DownloadManager)."""
     with _dl_lock:
+        cancel_event = _cancel_events.get(dl_id)
+        if cancel_event is None:
+            cancel_event = threading.Event()
+            _cancel_events[dl_id] = cancel_event
+
         if dl_id not in _downloads:
             _downloads[dl_id] = {
                 "id": dl_id, "url": url, "status": "starting",
@@ -415,23 +435,29 @@ def ytdlp_download(dl_id, url, format_id, output_ext, sub_lang=None,
         else:
             _downloads[dl_id].update({"status": "starting", "error": ""})
 
-    # Template de sortie — utilise le titre comme nom de fichier
+    if cancel_event.is_set():
+        with _dl_lock:
+            _downloads[dl_id].update({"status": "cancelled", "error": ""})
+        return
+
     out_tpl = str(DL_DIR / f"{dl_id}.%(ext)s")
 
     def hook(d):
+        if cancel_event.is_set():
+            raise RuntimeError("__CANCELLED__")
         with _dl_lock:
             dl = _downloads.get(dl_id, {})
             if d["status"] == "downloading":
-                total   = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
-                done    = d.get("downloaded_bytes", 0)
-                pct     = int(done / total * 100) if total else 0
-                t_info  = d.get("info_dict", {})
+                total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+                done = d.get("downloaded_bytes", 0)
+                pct = int(done / total * 100) if total else 0
+                t_info = d.get("info_dict", {})
                 dl.update({
                     "status": "downloading", "progress": pct,
-                    "speed": d.get("_speed_str","").strip(),
-                    "eta":   d.get("_eta_str","").strip(),
-                    "size":  fmt_size(total),
-                    "title": t_info.get("title","") or dl.get("title",""),
+                    "speed": d.get("_speed_str", "").strip(),
+                    "eta": d.get("_eta_str", "").strip(),
+                    "size": fmt_size(total),
+                    "title": t_info.get("title", "") or dl.get("title", ""),
                 })
             elif d["status"] == "finished":
                 dl.update({"status": "processing", "progress": 99})
@@ -441,70 +467,79 @@ def ytdlp_download(dl_id, url, format_id, output_ext, sub_lang=None,
         "outtmpl": out_tpl, "progress_hooks": [hook],
     }
 
-    if format_id == "best":       opts["format"] = "bestvideo+bestaudio/best"
-    elif format_id == "bestaudio": opts["format"] = "bestaudio/best"
-    else:                          opts["format"] = format_id
+    if format_id == "best":
+        opts["format"] = "bestvideo+bestaudio/best"
+    elif format_id == "bestaudio":
+        opts["format"] = "bestaudio/best"
+    else:
+        opts["format"] = format_id
 
-    if output_ext in ("mp4","mkv","webm"):
+    if output_ext in ("mp4", "mkv", "webm"):
         opts["merge_output_format"] = output_ext
-    elif output_ext in ("mp3","m4a","opus"):
+    elif output_ext in ("mp3", "m4a", "opus"):
         opts["postprocessors"] = [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": output_ext, "preferredquality": "192",
         }]
 
     if sub_lang:
-        opts["writesubtitles"]    = True
-        opts["subtitleslangs"]    = [sub_lang]
+        opts["writesubtitles"] = True
+        opts["subtitleslangs"] = [sub_lang]
         opts["writeautomaticsub"] = True
 
-    if custom_headers: opts["http_headers"] = custom_headers
+    if custom_headers:
+        opts["http_headers"] = custom_headers
 
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             info = ydl.extract_info(url, download=True)
 
-        title = (info.get("title","") if info else "") or video_title or ""
+        if cancel_event.is_set():
+            raise RuntimeError("__CANCELLED__")
 
-        # Trouver le fichier produit (stem = dl_id)
+        title = (info.get("title", "") if info else "") or video_title or ""
+
         filename = ""
         for fp in DL_DIR.iterdir():
             if fp.stem == dl_id:
                 filename = fp.name
                 break
 
-        # Renommer avec le titre de la vidéo
         if filename and title:
             ext_part = Path(filename).suffix.lstrip(".")
             nice_name = safe_filename(title, ext_part)
-            new_path  = DL_DIR / nice_name
-            # Éviter les collisions
+            new_path = DL_DIR / nice_name
             if new_path.exists() and new_path != DL_DIR / filename:
-                base, ext_ = nice_name.rsplit(".",1)
-                nice_name  = f"{base}_{dl_id[:4]}.{ext_}"
-                new_path   = DL_DIR / nice_name
+                base, ext_ = nice_name.rsplit(".", 1)
+                nice_name = f"{base}_{dl_id[:4]}.{ext_}"
+                new_path = DL_DIR / nice_name
             try:
                 (DL_DIR / filename).rename(new_path)
                 filename = nice_name
             except Exception as rename_err:
                 print(f"  [DL] Rename impossible : {rename_err}")
 
-        fsize = fmt_size(DL_DIR / filename) if filename else "?"
+        fsize = fmt_size(DL_DIR / filename) if filename else ""
         with _dl_lock:
             _downloads[dl_id].update({
                 "status": "done", "progress": 100,
                 "filename": filename, "title": title, "size": fsize,
             })
-        print(f"  [DL] ✓ {dl_id} → {filename}")
+        print(f"  [DL] ok {dl_id} -> {filename}")
 
     except Exception as e:
+        if cancel_event.is_set() or "__CANCELLED__" in str(e):
+            with _dl_lock:
+                _downloads[dl_id].update({"status": "cancelled", "error": ""})
+            print(f"  [DL] cancelled {dl_id}")
+            return
+
         with _dl_lock:
-            _downloads[dl_id].update({"status":"error","error":str(e)})
-        print(f"  [DL] ✗ {dl_id} : {e}")
+            _downloads[dl_id].update({"status": "error", "error": str(e)})
+        print(f"  [DL] error {dl_id} : {e}")
         raise e
 
 
-# ── Collections helpers ─────────────────────────────────
 def list_collections():
     cols = []
     for f in sorted(COLLECTIONS_DIR.glob("*.json")):
@@ -599,7 +634,7 @@ class Handler(BaseHTTPRequestHandler):
             steps.append("hakunaymatata-api")
             try:
                 dls, caps, _ = api_hakunaymatata(url, ch or None)
-                streams = [{**d,"proxy_url":"/api/proxy?url="+urllib.parse.quote(d["url"],safe="")}
+                streams = [{**d,"proxy_url":"/api/proxyurl="+urllib.parse.quote(d["url"],safe="")}
                            for d in dls]
                 self.json(200,{"ok":True,"method":"hakunaymatata-api",
                     "streams":streams,"captions":caps,
@@ -614,7 +649,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 res = ytdlp_resolve(url, ch or None, referer)
                 su  = res["url"]
-                pu  = "/api/proxy?url="+urllib.parse.quote(su,safe="")
+                pu  = "/api/proxyurl="+urllib.parse.quote(su,safe="")
                 self.json(200,{"ok":True,"method":"yt-dlp",
                     "streams":[{"url":su,"proxy_url":pu,"resolution":0,
                                 "format":res.get("ext","mp4").upper(),"size":0}],
@@ -622,11 +657,14 @@ class Handler(BaseHTTPRequestHandler):
                     "title":res.get("title",""),"thumbnail":res.get("thumbnail",""),
                     "steps":steps}); return
             except Exception as e:
+                if is_youtube_bot_error(str(e)):
+                    steps.append("ytdlp-BOT-CHECK")
+                    self.json(200,{"ok":False,"method":"yt-dlp","bot_check":True,"steps":steps,"error":youtube_bot_hint()}); return
                 steps.append(f"ytdlp-FAIL:{e}")
 
         # 3. Fallback
         steps.append("direct-fallback")
-        pu = "/api/proxy?url="+urllib.parse.quote(url,safe="")
+        pu = "/api/proxyurl="+urllib.parse.quote(url,safe="")
         self.json(200,{"ok":False,"method":"direct-fallback",
             "streams":[{"url":url,"proxy_url":pu,"resolution":0,"format":"MP4","size":0}],
             "stream_url":url,"proxy_url":pu,"steps":steps,
@@ -709,7 +747,10 @@ class Handler(BaseHTTPRequestHandler):
             self.json(200,{"ok":True,**ytdlp_playlist(url, ch or None)})
         except Exception as e:
             print(f"  [PLAYLIST] {e}")
-            self.json(200,{"ok":False,"error":str(e)})
+            if is_youtube_bot_error(str(e)):
+                self.json(200,{"ok":False,"bot_check":True,"error":youtube_bot_hint()})
+            else:
+                self.json(200,{"ok":False,"error":str(e)})
 
     # ── /api/ytdl/info ───────────────────────────────
     def _ytdl_info(self):
@@ -722,7 +763,10 @@ class Handler(BaseHTTPRequestHandler):
             ch = load_custom_headers()
             self.json(200,{"ok":True,**ytdlp_info(url, ch or None)})
         except Exception as e:
-            self.json(200,{"ok":False,"error":str(e)})
+            if is_youtube_bot_error(str(e)):
+                self.json(200,{"ok":False,"bot_check":True,"error":youtube_bot_hint()})
+            else:
+                self.json(200,{"ok":False,"error":str(e)})
 
     # ── /api/ytdl/download ───────────────────────────
     def _ytdl_download(self):
@@ -735,6 +779,8 @@ class Handler(BaseHTTPRequestHandler):
         title     = b.get("title","")
         if not url: self.json(400,{"error":"url manquant"}); return
         dl_id = str(uuid.uuid4())[:8]
+        with _dl_lock:
+            _cancel_events[dl_id] = threading.Event()
         ch    = load_custom_headers()
         dl_manager.add(dl_id, ytdlp_download, url, format_id, ext, sub_lang, ch or None, title)
         print(f"  [QUEUE] Ajouté {dl_id} fmt={format_id}")
@@ -753,6 +799,8 @@ class Handler(BaseHTTPRequestHandler):
         ch  = load_custom_headers()
         for url in urls[:50]:
             dl_id = str(uuid.uuid4())[:8]
+            with _dl_lock:
+                _cancel_events[dl_id] = threading.Event()
             dl_manager.add(dl_id, ytdlp_download, url, format_id, ext, sub_lang, ch or None)
             ids.append(dl_id)
         print(f"  [BATCH] {len(ids)} DLs en queue")
@@ -767,6 +815,13 @@ class Handler(BaseHTTPRequestHandler):
             dl = _downloads.get(dl_id)
         if not dl: self.json(404, {"error": "Inconnu"}); return
         
+        with _dl_lock:
+            ev = _cancel_events.get(dl_id)
+            if ev is None:
+                ev = threading.Event()
+                _cancel_events[dl_id] = ev
+            ev.clear()
+
         ch = load_custom_headers()
         # Correction de l'ordre : dl_id, url, format_id, output_ext, sub_lang, custom_headers, video_title
         dl_manager.add(dl_id, ytdlp_download, dl["url"], "best", "mp4", None, ch or None, dl.get("title"))
@@ -796,8 +851,14 @@ class Handler(BaseHTTPRequestHandler):
     def _ytdl_cancel(self):
         b = self.body()
         if b is None: return
+        dl_id = b.get("id","")
         with _dl_lock:
-            dl = _downloads.get(b.get("id",""))
+            ev = _cancel_events.get(dl_id)
+            if ev is None:
+                ev = threading.Event()
+                _cancel_events[dl_id] = ev
+            ev.set()
+            dl = _downloads.get(dl_id)
             if dl: dl["status"] = "cancelled"
         self.json(200,{"ok":True})
 
@@ -876,7 +937,7 @@ class Handler(BaseHTTPRequestHandler):
         if action == "add":
             item = b.get("item",{})
             if not item.get("url"): self.json(400,{"error":"url manquant"}); return
-            item["id"]    = hashlib.md5(item["url"].encode()).hexdigest()[:8]
+            item["id"]    = str(uuid.uuid4())[:8]
             item["added"] = int(time.time())
             item["played"]= False
             queue.append(item)
@@ -1035,7 +1096,7 @@ class Handler(BaseHTTPRequestHandler):
     def _post_history(self):
         b = self.body()
         if b is None: return
-        self.json(200, add_to_history(b.get("url",""),b.get("title",""),b.get("method","?")))
+        self.json(200, add_to_history(b.get("url",""),b.get("title",""),b.get("method","")))
     def _del_history(self):
         b = self.body()
         if b is None: return

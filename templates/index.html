@@ -16,7 +16,7 @@
 <title>StreamVault</title>
 <link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2family=Bebas+Neue&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.12/hls.min.js"></script>
 <link rel="stylesheet" href="/static/css/main.css">
 </head>
@@ -46,6 +46,10 @@
     </ul>
 
     <div class="nav-right">
+      <div class="queue-indicator" id="queue-indicator" style="display:none">
+        <span>Queue</span>
+        <span class="count-badge" id="queue-count">0</span>
+      </div>
       <div class="server-status" id="server-status">
         <div class="status-dot"></div><span>Online</span>
       </div>
@@ -331,7 +335,7 @@
         <div class="input-wrap" style="flex:1">
           <span class="input-icon">↗</span>
           <input type="text" id="dl-url-input" class="url-input"
-            placeholder="https://youtube.com/watch?v=… ou playlist"
+            placeholder="https://youtube.com/watchv=… ou playlist"
             onkeydown="if(event.key==='Enter')analyzeDl()"/>
         </div>
         <button class="btn-primary" id="dl-analyze-btn" onclick="analyzeDl()">Analyser</button>
@@ -625,10 +629,10 @@
         <div class="howto-card-icon">⚙</div>
         <h3>API du serveur</h3>
         <div class="howto-api-table">
-          <div class="hat-row"><code>GET /api/resolve?url=</code><span>Résout une URL via API site / yt-dlp</span></div>
-          <div class="hat-row"><code>GET /api/proxy?url=</code><span>Stream relay avec support Range (seek)</span></div>
-          <div class="hat-row"><code>GET /api/playlist?url=</code><span>Extrait toutes les vidéos d'une playlist</span></div>
-          <div class="hat-row"><code>GET /api/video/info?url=</code><span>Formats, audio, sous-titres d'une vidéo</span></div>
+          <div class="hat-row"><code>GET /api/resolveurl=</code><span>Résout une URL via API site / yt-dlp</span></div>
+          <div class="hat-row"><code>GET /api/proxyurl=</code><span>Stream relay avec support Range (seek)</span></div>
+          <div class="hat-row"><code>GET /api/playlisturl=</code><span>Extrait toutes les vidéos d'une playlist</span></div>
+          <div class="hat-row"><code>GET /api/video/infourl=</code><span>Formats, audio, sous-titres d'une vidéo</span></div>
           <div class="hat-row"><code>POST /api/ytdl/download</code><span>Lance un téléchargement yt-dlp</span></div>
           <div class="hat-row"><code>POST /api/ytdl/download/batch</code><span>Téléchargement en lot (playlist)</span></div>
           <div class="hat-row"><code>GET /api/collections</code><span>Liste les collections</span></div>

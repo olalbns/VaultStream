@@ -67,7 +67,7 @@ function renderVideos() {
   const list  = document.getElementById('video-list');
   const badge = document.getElementById('count-badge');
 
-  badge.textContent = videos.length > 0 ? ` (${videos.length})` : '';
+  badge.textContent = videos.length > 0 ` (${videos.length})` : '';
 
   if (!videos.length) {
     list.innerHTML = `
@@ -83,18 +83,18 @@ function renderVideos() {
     const url = v.url || v;
     let domain = url;
     try { domain = new URL(url).hostname; } catch {}
-    const ago = v.ts ? Math.round((Date.now() - v.ts) / 1000) + 's' : '';
+    const ago = v.ts Math.round((Date.now() - v.ts) / 1000) + 's' : '';
 
     return `
       <div class="video-item" onclick="sendVideo(${ri})">
         <div class="vi-icon">🎞</div>
         <div class="vi-body">
           <div class="vi-url" title="${esc(url)}">${esc(domain)}</div>
-          <div class="vi-meta">${esc(url.slice(0, 50))}… ${ago ? '· ' + ago : ''}</div>
+          <div class="vi-meta">${esc(url.slice(0, 50))}… ${ago '· ' + ago : ''}</div>
         </div>
-        <button class="vi-btn ${v.sent ? 'sent' : ''}" id="vbtn-${ri}"
+        <button class="vi-btn ${v.sent 'sent' : ''}" id="vbtn-${ri}"
           onclick="event.stopPropagation();sendVideo(${ri})">
-          ${v.sent ? '✓' : '▶ Lire'}
+          ${v.sent '✓' : '▶ Lire'}
         </button>
       </div>`;
   }).join('');
@@ -135,7 +135,7 @@ async function sendManual() {
     setStatus('▶ Envoyé à StreamVault');
     setTimeout(() => openSV(), 300);
   } else {
-    setStatus('Erreur : ' + (res.error || '?'));
+    setStatus('Erreur : ' + (res.error || ''));
   }
 }
 
@@ -148,7 +148,7 @@ async function sendPage() {
     setStatus('▶ Page envoyée à StreamVault');
     setTimeout(() => openSV(), 300);
   } else {
-    setStatus('Erreur : ' + (res.error || '?'));
+    setStatus('Erreur : ' + (res.error || ''));
   }
 }
 

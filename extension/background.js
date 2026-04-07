@@ -27,9 +27,9 @@ const VIDEO_MIME_TYPES = [
 
 // Patterns d'URL CDN/streaming connus
 const CDN_PATTERNS = [
-  /\.(mp4|webm|mkv|m4v|ogv|ts|m3u8|mpd)(\?|#|$)/i,
+  /\.(mp4|webm|mkv|m4v|ogv|ts|m3u8|mpd)(\|#|$)/i,
   /\/(resource|stream|video|media|cdn|vod|hls|bt)\//i,
-  /[?&](sign|token|t|expires|key|auth)=[a-f0-9]+/i,
+  /[&](sign|token|t|expires|key|auth)=[a-f0-9]+/i,
 ];
 
 // Domaines à ignorer (analytics, pubs, etc.)
@@ -157,7 +157,7 @@ function isIgnoredDomain(url) {
 function updateBadge(tabId) {
   const count = (detectedVideos[tabId] || []).length;
   chrome.action.setBadgeText({
-    text:  count > 0 ? String(count) : '',
+    text:  count > 0 String(count) : '',
     tabId: tabId,
   });
   chrome.action.setBadgeBackgroundColor({ color: '#e5091a' });
@@ -190,7 +190,7 @@ async function sendToStreamVault(entry) {
       openStreamVault(entry.url);
     }
   } catch (e) {
-    console.warn(`[SV] Impossible d'envoyer à StreamVault (serveur démarré ?) : ${e.message}`);
+    console.warn(`[SV] Impossible d'envoyer à StreamVault (serveur démarré ) : ${e.message}`);
   }
 }
 
@@ -223,7 +223,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'GET_VIDEOS') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tabId = tabs[0]?.id;
+      const tabId = tabs[0].id;
       sendResponse({
         videos: detectedVideos[tabId] || [],
         tabId:  tabId,
@@ -253,6 +253,40 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg.type === 'VIDEO_DETECTED_DOM') {
+    const tabId = sender.tab.id -1;
+    const entry = {
+      url: msg.url,
+      headers: {},
+      referer: msg.referer || '',
+      tabId,
+      ts: Date.now(),
+      sent: false,
+    };
+
+    if (!entry.url || !isVideoUrl(entry.url) || isIgnoredDomain(entry.url)) {
+      sendResponse({ ok: false });
+      return true;
+    }
+
+    if (!detectedVideos[tabId]) detectedVideos[tabId] = [];
+    const existing = detectedVideos[tabId];
+    const isDup = existing.some(e => e.url === entry.url && (Date.now() - e.ts) < 10000);
+    if (!isDup) {
+      existing.push(entry);
+      if (existing.length > 20) existing.shift();
+      updateBadge(tabId);
+      chrome.runtime.sendMessage({
+        type: 'VIDEO_DETECTED',
+        entry: { url: entry.url, referer: entry.referer, ts: entry.ts },
+        tabId,
+      }).catch(() => {});
+      if (autoSend) sendToStreamVault(entry);
+    }
+    sendResponse({ ok: true });
+    return true;
+  }
+
   if (msg.type === 'SET_CONFIG') {
     if (msg.svUrl !== undefined) {
       svUrl = msg.svUrl;
@@ -277,7 +311,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
   if (msg.type === 'CLEAR_VIDEOS') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const tabId = tabs[0]?.id;
+      const tabId = tabs[0].id;
       if (tabId) {
         detectedVideos[tabId] = [];
         updateBadge(tabId);

@@ -54,7 +54,7 @@
           if (node.currentSrc) reportUrl(node.currentSrc, window.location.href);
         }
         // Chercher dans les enfants aussi
-        node.querySelectorAll?.('video').forEach(v => {
+        node.querySelectorAll.('video').forEach(v => {
           if (v.src) reportUrl(v.src, window.location.href);
           if (v.currentSrc) reportUrl(v.currentSrc, window.location.href);
         });

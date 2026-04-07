@@ -14,44 +14,6 @@ function setFmtTab(name, btn) {
   document.getElementById(`fmt-${name}`).classList.add('active');
 }
 
-async function analyzeDl() {
-  const url = document.getElementById('dl-url-input').value.trim();
-  if (!url) { toast('Colle un lien', '⚠'); return; }
-  _dlUrl = url;
-
-  const btn = document.getElementById('dl-analyze-btn');
-  btn.disabled = true;
-  btn.textContent = '…';
-
-  document.getElementById('dl-info-panel').style.display = 'none';
-  toast('Analyse en cours…', '⏳');
-
-  try {
-    const res  = await fetch('/api/ytdl/info', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
-    });
-    const data = await res.json();
-
-    if (!data.ok) {
-      toast('Erreur : ' + (data.error || 'yt-dlp échec'), '✗');
-      return;
-    }
-
-    _dlInfo = data;
-    renderDlInfo(data);
-    document.getElementById('dl-info-panel').style.display = 'block';
-    toast('✓ ' + data.formats.length + ' formats trouvés', '✓');
-
-  } catch (e) {
-    toast('Erreur réseau : ' + e.message, '✗');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Analyser';
-  }
-}
-
 function renderDlInfo(info) {
   // Header
   const thumb = document.getElementById('dl-thumb');
@@ -76,7 +38,7 @@ function renderDlInfo(info) {
   // Add "best" option
   const bestRow = makeFormatRow({
     id:'best', type:'video+audio', ext:'mp4',
-    resolution:'Meilleure qualité', note:'Auto (vidéo + audio)', filesize_str:'?',
+    resolution:'Meilleure qualité', note:'Auto (vidéo + audio)', filesize_str:'',
   }, _dlUrl);
 
   document.getElementById('formats-video').innerHTML =
@@ -96,20 +58,20 @@ function renderDlInfo(info) {
     audioFmts.map(f => makeFormatRow(f, _dlUrl)).join('');
 
   // Subtitles
-  if (info.subtitles?.length) {
+  if (info.subtitles.length) {
     document.getElementById('formats-subs').innerHTML =
       info.subtitles.map(s => `
         <div class="fmt-row">
           <div class="fmt-badge sub">${s.ext.toUpperCase()}</div>
           <div class="fmt-info">
-            <div class="fmt-res">${s.name} ${s.auto ? '<span style="color:var(--muted);font-size:10px">(auto)</span>' : ''}</div>
+            <div class="fmt-res">${s.name} ${s.auto '<span style="color:var(--muted);font-size:10px">(auto)</span>' : ''}</div>
             <div class="fmt-detail">${s.lang} · ${s.ext}</div>
           </div>
           <div class="fmt-actions">
             <button class="btn-primary" style="font-size:11px;padding:7px 14px"
               onclick="startSubDownload('${esc(_dlUrl)}','${s.lang}','${s.ext}')">↓ Télécharger</button>
             <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
-              onclick="window.open('/api/proxy?url='+encodeURIComponent('${esc(s.url)}'))">👁 Voir</button>
+              onclick="window.open('/api/proxyurl='+encodeURIComponent('${esc(s.url)}'))">👁 Voir</button>
           </div>
         </div>`).join('');
   } else {
@@ -119,15 +81,15 @@ function renderDlInfo(info) {
 }
 
 function makeFormatRow(f, url) {
-  const typeClass = f.type === 'video+audio' ? 'both' : f.type === 'audio' ? 'audio' : 'video';
-  const typeLabel = f.type === 'video+audio' ? 'V+A' : f.type === 'audio' ? 'AUDIO' : 'VIDÉO';
+  const typeClass = f.type === 'video+audio' 'both' : f.type === 'audio' 'audio' : 'video';
+  const typeLabel = f.type === 'video+audio' 'V+A' : f.type === 'audio' 'AUDIO' : 'VIDÉO';
   const res = f.resolution || 'audio';
   const detail = [
-    f.ext?.toUpperCase(),
-    f.vcodec && f.vcodec !== 'none' ? f.vcodec.split('.')[0] : null,
-    f.acodec && f.acodec !== 'none' ? f.acodec.split('.')[0] : null,
-    f.fps ? f.fps + 'fps' : null,
-    f.tbr ? Math.round(f.tbr) + 'kbps' : null,
+    f.ext.toUpperCase(),
+    f.vcodec && f.vcodec !== 'none' f.vcodec.split('.')[0] : null,
+    f.acodec && f.acodec !== 'none' f.acodec.split('.')[0] : null,
+    f.fps f.fps + 'fps' : null,
+    f.tbr Math.round(f.tbr) + 'kbps' : null,
     f.note || null,
   ].filter(Boolean).join(' · ');
 
@@ -138,13 +100,13 @@ function makeFormatRow(f, url) {
         <div class="fmt-res">${res}</div>
         <div class="fmt-detail">${detail}</div>
       </div>
-      <span class="fmt-size">${f.filesize_str||'?'}</span>
+      <span class="fmt-size">${f.filesize_str||''}</span>
       <div class="fmt-actions">
         <button class="btn-primary" style="font-size:11px;padding:7px 14px"
           onclick="startDownload('${esc(url)}','${f.id}','${f.ext||'mp4'}')">
-          ↓ ${f.ext?.toUpperCase()||'DL'}
+          ↓ ${f.ext.toUpperCase()||'DL'}
         </button>
-        ${f.type==='video+audio'||f.type==='video' ? `
+        ${f.type==='video+audio'||f.type==='video' `
         <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
           onclick="startDownload('${esc(url)}','${f.id}','mp4')">
           ↓ MP4
@@ -189,7 +151,7 @@ function trackDownload(dlId) {
   if (_dlPollTimers[dlId]) return;
   _dlPollTimers[dlId] = setInterval(async () => {
     try {
-      const res  = await fetch(`/api/ytdl/progress?id=${dlId}`);
+      const res  = await fetch(`/api/ytdl/progressid=${dlId}`);
       const data = await res.json();
       updateDlItem(data);
       if (['done','error','cancelled'].includes(data.status)) {
@@ -212,12 +174,12 @@ function updateDlItem(dl) {
   el.querySelector('.dl-progress-fill').style.width = dl.progress + '%';
   el.querySelector('.dl-progress-pct').textContent = dl.progress + '%';
   el.querySelector('.dl-progress-speed').textContent = dl.speed || '';
-  el.querySelector('.dl-progress-eta').textContent  = dl.eta ? 'ETA: ' + dl.eta : '';
+  el.querySelector('.dl-progress-eta').textContent  = dl.eta 'ETA: ' + dl.eta : '';
   if (dl.title) el.querySelector('.dl-item-title').textContent = dl.title;
   if (dl.status === 'done' && dl.filename) {
     const actionsEl = el.querySelector('.dl-item-actions');
     actionsEl.innerHTML = `
-      <a href="/api/downloads/file?f=${encodeURIComponent(dl.filename)}" download
+      <a href="/api/downloads/filef=${encodeURIComponent(dl.filename)}" download
         class="btn-primary" style="font-size:11px;padding:7px 16px;text-decoration:none">
         ↓ Sauvegarder
       </a>
@@ -266,20 +228,20 @@ function renderDlList(data) {
       <div class="dl-progress-meta">
         <span class="dl-progress-pct">${dl.progress||0}%</span>
         <span class="dl-progress-speed">${dl.speed||''}</span>
-        <span class="dl-progress-eta">${dl.eta?'ETA: '+dl.eta:''}</span>
+        <span class="dl-progress-eta">${dl.eta'ETA: '+dl.eta:''}</span>
         <span>${dl.size||''}</span>
       </div>
-      ${dl.error ? `<div style="font-size:11px;color:#ff6060;margin-top:6px">✗ ${esc(dl.error)}</div>` : ''}
+      ${dl.error `<div style="font-size:11px;color:#ff6060;margin-top:6px">✗ ${esc(dl.error)}</div>` : ''}
       <div class="dl-item-actions">
-        ${dl.status==='done'&&dl.filename ? `
-          <a href="/api/downloads/file?f=${encodeURIComponent(dl.filename)}" download
+        ${dl.status==='done'&&dl.filename `
+          <a href="/api/downloads/filef=${encodeURIComponent(dl.filename)}" download
             class="btn-primary" style="font-size:11px;padding:7px 16px;text-decoration:none">↓ Sauvegarder</a>
           <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
             onclick="playDownloaded('${esc(dl.filename)}')">▶ Lire</button>` : ''}
-        ${dl.status==='error' ? `
+        ${dl.status==='error' `
           <button class="btn-primary" style="font-size:11px;padding:7px 14px"
             onclick="retryDl('${dl.id}')">↺ Réessayer</button>` : ''}
-        ${dl.status==='downloading' ? `
+        ${dl.status==='downloading' `
           <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
             onclick="cancelDl('${dl.id}')">✕ Annuler</button>` : ''}
       </div>
@@ -311,7 +273,7 @@ async function retryDl(id) {
 }
 
 function playDownloaded(filename) {
-  const url = `/api/downloads/file?f=${encodeURIComponent(filename)}`;
+  const url = `/api/downloads/filef=${encodeURIComponent(filename)}`;
   showPage('player');
   document.getElementById('nav-player-li').style.display = 'block';
   Player.load(url);
@@ -362,23 +324,25 @@ async function analyzeDl() {
   try {
     // Check if playlist first
     const [plRes, infoRes] = await Promise.allSettled([
-      fetch(`/api/playlist?url=${encodeURIComponent(url)}`).then(r=>r.json()),
+      fetch(`/api/playlisturl=${encodeURIComponent(url)}`).then(r=>r.json()),
       fetch('/api/ytdl/info', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ url }),
       }).then(r=>r.json()),
     ]);
 
-    const plData   = plRes.status==='fulfilled' ? plRes.value : null;
-    const infoData = infoRes.status==='fulfilled' ? infoRes.value : null;
+    const plData   = plRes.status==='fulfilled' plRes.value : null;
+    const infoData = infoRes.status==='fulfilled' infoRes.value : null;
 
-    if (plData?.ok && plData?.is_playlist && plData?.items?.length > 1) {
+    if (plData.ok && plData.is_playlist && plData.items.length > 1) {
       // It's a playlist
       _dlPlaylist = plData;
       renderDlPlaylist(plData);
       document.getElementById('dl-playlist-section').style.display = 'block';
       toast(`✓ Playlist : ${plData.count} vidéos`, '✓');
-    } else if (infoData?.ok) {
+    } else if (infoData.bot_check) {
+      toast(infoData.error || 'YouTube demande une verification anti-bot', '');
+    } else if (infoData.ok) {
       // Single video
       _dlInfo = infoData;
       renderDlInfo(infoData);
@@ -397,7 +361,7 @@ async function analyzeDl() {
 function renderDlPlaylist(pl) {
   document.getElementById('dl-playlist-title').textContent = pl.title || 'Playlist';
   document.getElementById('dl-playlist-info').textContent  =
-    `${pl.count} vidéos${pl.uploader ? ' · ' + pl.uploader : ''}`;
+    `${pl.count} vidéos${pl.uploader ' · ' + pl.uploader : ''}`;
 
   _selectedItems = new Set(pl.items.map((_,i)=>i));
   updateSelectCount();
@@ -406,11 +370,11 @@ function renderDlPlaylist(pl) {
     <div class="dl-pl-item">
       <input type="checkbox" checked data-idx="${i}" onchange="toggleItem(${i},this.checked)">
       <div class="dl-pl-thumb">
-        ${item.thumbnail ? `<img src="${item.thumbnail}" loading="lazy" onerror="this.style.display='none'">` : ''}
+        ${item.thumbnail `<img src="${item.thumbnail}" loading="lazy" onerror="this.style.display='none'">` : ''}
       </div>
       <div class="dl-pl-info">
         <div class="dl-pl-title">${esc(item.title)}</div>
-        <div class="dl-pl-meta">${item.duration?fmtDuration(item.duration):''}</div>
+        <div class="dl-pl-meta">${item.durationfmtDuration(item.duration):''}</div>
       </div>
       <div class="dl-pl-actions">
         <button class="btn-tiny" onclick="startDownload('${esc(item.url)}','best','mp4')">↓</button>
@@ -448,7 +412,7 @@ function getSelectedPlaylistItems() {
 }
 
 async function dlPlaylistAll() {
-  if (!_dlPlaylist?.items?.length) return;
+  if (!_dlPlaylist.items.length) return;
   const urls = _dlPlaylist.items.map(i => i.url);
   await batchDownload(urls);
 }
@@ -476,7 +440,7 @@ async function batchDownload(urls) {
 }
 
 async function addPlaylistToQueue() {
-  if (!_dlPlaylist?.items?.length) return;
+  if (!_dlPlaylist.items.length) return;
   for (const item of _dlPlaylist.items) {
     await fetch('/api/queue', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -488,7 +452,7 @@ async function addPlaylistToQueue() {
 }
 
 function playPlaylistItemDl(idx) {
-  if (!_dlPlaylist?.items?.[idx]) return;
+  if (!_dlPlaylist.items.[idx]) return;
   const item = _dlPlaylist.items[idx];
   showPage('player');
   document.getElementById('nav-player-li').style.display = 'block';
