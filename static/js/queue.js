@@ -11,7 +11,7 @@ async function loadQueue() {
     _queue = await res.json();
     renderQueue();
     updateQueueIndicator();
-  } catch {}
+  } catch { }
 }
 
 async function addToQueueManual() {
@@ -39,7 +39,7 @@ async function playNextQueue() {
   const next = pending[0];
   await queueAction('played', { id: next.id });
   showPage('player');
-  document.getElementById('nav-player-li').style.display = 'block';
+  const navP = document.getElementById('nav-player'); if (navP) navP.style.display = '';
   await Player.load(next.url);
   toast(`▶ ${getDomain(next.url)}`, '≡');
 }
@@ -67,7 +67,7 @@ async function playQueueItem(id) {
   if (!item) return;
   await queueAction('played', { id });
   showPage('player');
-  document.getElementById('nav-player-li').style.display = 'block';
+  const navP = document.getElementById('nav-player'); if (navP) navP.style.display = '';
   await Player.load(item.url);
 }
 
@@ -88,7 +88,7 @@ async function queueAction(action, extra = {}) {
 }
 
 function renderQueue() {
-  const list  = document.getElementById('queue-list');
+  const list = document.getElementById('queue-list');
   const empty = document.getElementById('queue-empty');
   if (!list) return;
 
@@ -102,9 +102,9 @@ function renderQueue() {
   if (empty) empty.style.display = 'none';
 
   list.innerHTML = _queue.map((q, i) => `
-    <div class="queue-item ${q.played ?'played' : ''}" id="qi-${q.id}">
+    <div class="queue-item ${q.played ? 'played' : ''}" id="qi-${q.id}">
       <div class="qi-num">${i + 1}</div>
-      <div class="qi-icon">${q.played ?'✓' : '🎞'}</div>
+      <div class="qi-icon">${q.played ? '✓' : '🎞'}</div>
       <div class="qi-info">
         <div class="qi-title">${esc(getDomain(q.url))}</div>
         <div class="qi-url">${esc(q.url)}</div>
@@ -123,7 +123,7 @@ function updateQueueIndicator() {
   const ind = document.getElementById('queue-indicator');
   const cnt = document.getElementById('queue-count');
   if (!ind) return;
-  ind.style.display = pending > 0 ?'flex' : 'none';
+  ind.style.display = pending > 0 ? 'flex' : 'none';
   if (cnt) cnt.textContent = pending;
 }
 
@@ -133,7 +133,7 @@ function getDomain(url) {
 
 function esc(s) {
   return String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
 }
 
 // Load queue on startup

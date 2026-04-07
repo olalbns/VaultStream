@@ -149,7 +149,7 @@ def safe_filename(title, ext="mp4"):
     if not title:
         return f"video.{ext}"
     # Enlever les caractères interdits sur Windows/Linux
-    safe = re.sub(r'[\\/:*"<>|]', '_', title)
+    safe = re.sub(r'[\\/:*?"<>|]', '_', title)
     safe = safe.strip(". ")[:120]   # max 120 chars
     return f"{safe}.{ext}" if safe else f"video.{ext}"
 
@@ -185,7 +185,7 @@ def build_headers(target_url, referer=None, extra=None):
 
 def mime_from_url(url, fallback="video/mp4"):
     for ext, mime in MIME_MAP.items():
-        if ext in url.lower().split("")[0] and mime.startswith("video"):
+        if ext in url.lower().split("?")[0] and mime.startswith("video"):
             return mime
     return fallback
 
@@ -207,7 +207,7 @@ def youtube_bot_hint():
 def api_hakunaymatata(page_url, custom_headers=None):
     parsed   = urllib.parse.urlparse(page_url)
     host     = parsed.netloc
-    m        = re.search(r'/(:watch|video|v|episode|e)/([a-zA-Z0-9_-]+)', parsed.path)
+    m        = re.search(r'/(?:watch|video|v|episode|e)/([a-zA-Z0-9_-]+)', parsed.path)
     vid_id   = m.group(1) if m else ([s for s in parsed.path.split('/') if s] or [""])[-1]
     print(f"  [HAKU] ID={vid_id}")
 
@@ -218,10 +218,10 @@ def api_hakunaymatata(page_url, custom_headers=None):
     if custom_headers: base.update(custom_headers)
 
     for api_url in [
-        f"https://{host}/api/resourceid={vid_id}",
-        f"https://{host}/api/videoid={vid_id}",
-        f"https://{host}/api/episodeid={vid_id}",
-        f"https://www.hakunaymatata.com/api/resourceid={vid_id}",
+        f"https://{host}/api/resource?id={vid_id}",
+        f"https://{host}/api/video?id={vid_id}",
+        f"https://{host}/api/episode?id={vid_id}",
+        f"https://www.hakunaymatata.com/api/resource?id={vid_id}",
     ]:
         try:
             with urllib.request.urlopen(
@@ -373,7 +373,7 @@ def ytdlp_playlist(url, custom_headers=None):
         if not e: continue
         vid_url = e.get("url") or e.get("webpage_url","")
         if not vid_url and e.get("id"):
-            vid_url = f"https://www.youtube.com/watchv={e['id']}"
+            vid_url = f"https://www.youtube.com/watch?v={e['id']}"
         if not vid_url: continue
         items.append({
             "id": e.get("id",""), "title": e.get("title","Sans titre"),
@@ -408,7 +408,7 @@ def ytdlp_search(query, limit=20, custom_headers=None):
         if not e: continue
         items.append({
             "id": e.get("id"), "title": e.get("title"),
-            "url": e.get("url") or f"https://www.youtube.com/watchv={e.get('id')}",
+            "url": e.get("url") or f"https://www.youtube.com/watch?v={e.get('id')}",
             "thumbnail": e.get("thumbnail"),
             "duration": e.get("duration"),
             "uploader": e.get("uploader"),
@@ -637,7 +637,7 @@ class Handler(BaseHTTPRequestHandler):
             steps.append("hakunaymatata-api")
             try:
                 dls, caps, _ = api_hakunaymatata(url, ch or None)
-                streams = [{**d,"proxy_url":"/api/proxyurl="+urllib.parse.quote(d["url"],safe="")}
+                streams = [{**d,"proxy_url":"/api/proxy?url="+urllib.parse.quote(d["url"],safe="")}
                            for d in dls]
                 self.json(200,{"ok":True,"method":"hakunaymatata-api",
                     "streams":streams,"captions":caps,
@@ -652,7 +652,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 res = ytdlp_resolve(url, ch or None, referer)
                 su  = res["url"]
-                pu  = "/api/proxyurl="+urllib.parse.quote(su,safe="")
+                pu  = "/api/proxy?url="+urllib.parse.quote(su,safe="")
                 self.json(200,{"ok":True,"method":"yt-dlp",
                     "streams":[{"url":su,"proxy_url":pu,"resolution":0,
                                 "format":res.get("ext","mp4").upper(),"size":0}],
@@ -667,7 +667,7 @@ class Handler(BaseHTTPRequestHandler):
 
         # 3. Fallback
         steps.append("direct-fallback")
-        pu = "/api/proxyurl="+urllib.parse.quote(url,safe="")
+        pu = "/api/proxy?url="+urllib.parse.quote(url,safe="")
         self.json(200,{"ok":False,"method":"direct-fallback",
             "streams":[{"url":url,"proxy_url":pu,"resolution":0,"format":"MP4","size":0}],
             "stream_url":url,"proxy_url":pu,"steps":steps,
