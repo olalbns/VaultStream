@@ -139,7 +139,7 @@ async function removeFromCol(colId, itemId) {
 // ── Collection actions ────────────────────────────────
 async function playFromCollection(url) {
   showPage('player');
-  document.getElementById('nav-player').style.display = '';
+  document.getElementById('nav-player-li').style.display = 'block';
   await Player.load(url);
 }
 
@@ -161,7 +161,7 @@ async function playCollectionById(id) {
   const col = await res.json();
   if (!col?.items?.[0]) return;
   showPage('player');
-  document.getElementById('nav-player').style.display = '';
+  document.getElementById('nav-player-li').style.display = 'block';
   await Player.load(col.items[0].url);
   toast(`▶ ${col.name}`, '🎬');
 }

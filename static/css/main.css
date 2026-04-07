@@ -46,6 +46,7 @@ body {
   color: var(--text);
   min-height: 100vh;
   overflow-x: hidden;
+  padding-bottom: 52px;
 }
 a { text-decoration: none; color: inherit; }
 button { cursor: pointer; font-family: inherit; }
@@ -1493,5 +1494,54 @@ body::after {
   .cards-grid {
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 10px;
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   FOOTER
+   ══════════════════════════════════════════════════ */
+.app-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.footer-content {
+  max-width: 1600px;
+  width: 100%;
+}
+
+.footer-text {
+  text-align: center;
+  margin: 0;
+  font-weight: 500;
+}
+
+.footer-link {
+  color: var(--red);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s;
+}
+
+.footer-link:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+  .app-footer {
+    padding: 10px 16px;
+    font-size: 11px;
   }
 }

@@ -39,7 +39,7 @@ async function playNextQueue() {
   const next = pending[0];
   await queueAction('played', { id: next.id });
   showPage('player');
-  document.getElementById('nav-player').style.display = '';
+  document.getElementById('nav-player-li').style.display = 'block';
   await Player.load(next.url);
   toast(`▶ ${getDomain(next.url)}`, '≡');
 }
@@ -67,7 +67,7 @@ async function playQueueItem(id) {
   if (!item) return;
   await queueAction('played', { id });
   showPage('player');
-  document.getElementById('nav-player').style.display = '';
+  document.getElementById('nav-player-li').style.display = 'block';
   await Player.load(item.url);
 }
 

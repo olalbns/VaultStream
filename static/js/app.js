@@ -308,7 +308,7 @@ async function replayFromHistory(url) {
   document.getElementById('main-url-input').value = url;
   document.getElementById('sidebar-url-input').value = url;
   showPage('player');
-  document.getElementById('nav-player').style.display = '';
+  document.getElementById('nav-player-li').style.display = 'block';
   try {
     await Player.load(url);
     await refreshAllHistory();
@@ -355,7 +355,7 @@ setInterval(async () => {
       document.getElementById('main-url-input').value    = data.url;
       document.getElementById('sidebar-url-input').value = data.url;
       showPage('player');
-      document.getElementById('nav-player').style.display = '';
+      document.getElementById('nav-player-li').style.display = 'block';
       setTimeout(async () => {
         try {
           await Player.load(data.url);

@@ -313,7 +313,7 @@ async function retryDl(id) {
 function playDownloaded(filename) {
   const url = `/api/downloads/file?f=${encodeURIComponent(filename)}`;
   showPage('player');
-  document.getElementById('nav-player').style.display = '';
+  document.getElementById('nav-player-li').style.display = 'block';
   Player.load(url);
 }
 
@@ -491,6 +491,6 @@ function playPlaylistItemDl(idx) {
   if (!_dlPlaylist?.items?.[idx]) return;
   const item = _dlPlaylist.items[idx];
   showPage('player');
-  document.getElementById('nav-player').style.display = '';
+  document.getElementById('nav-player-li').style.display = 'block';
   Player.load(item.url);
 }
