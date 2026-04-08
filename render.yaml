@@ -4,18 +4,20 @@ services:
     runtime: python
     plan: free
     autoDeploy: true
-    buildCommand: |
-      python -m pip install --upgrade pip
-      if [ -f requirements.txt ]; then pip install -r requirements.txt; else pip install yt-dlp; fi
-      if [ -f package.json ]; then npm install; else npm install --no-save puppeteer; fi
-      npx puppeteer browsers install chrome
+    buildCommand: pip install -r requirements.txt
     startCommand: python server.py
     envVars:
       - key: PYTHON_VERSION
-        value: 3.12.8
-      - key: NODE_VERSION
-        value: 22.16.0
-      - key: PUPPETEER_CACHE_DIR
-        value: /opt/render/.cache/puppeteer
-      - key: PUPPETEER_SKIP_DOWNLOAD
-        value: "false"
+        value: "3.12.8"
+      # ──────────────────────────────────────────────
+      # Pour activer YouTube : colle ici tes cookies
+      # exportés depuis un navigateur (format Netscape)
+      # encodés en base64 :
+      #   base64 -w0 youtube_cookies.txt
+      # ──────────────────────────────────────────────
+      # - key: YTDLP_COOKIE_DATA_B64
+      #   value: "COLLE_ICI_LE_BASE64_DE_TES_COOKIES"
+      #
+      # Optionnel - clients YouTube à essayer en priorité:
+      - key: YTDLP_YT_PLAYER_CLIENTS
+        value: "android_vr,web_embedded,tv_simply,ios"
