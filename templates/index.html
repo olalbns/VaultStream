@@ -16,7 +16,8 @@
 <title>StreamVault</title>
 <link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2family=Bebas+Neue&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.12/hls.min.js"></script>
 <link rel="stylesheet" href="/static/css/main.css">
 </head>
@@ -154,7 +155,66 @@
           <p>Colle un lien pour démarrer</p>
         </div>
         <div class="stage-video" id="stage-video" style="display:none">
-          <video id="main-video" controls autoplay playsinline preload="metadata"></video>
+          <video id="main-video" autoplay playsinline preload="metadata"></video>
+
+          <!-- Netflix-style Custom Controls -->
+          <div class="netflix-controls" id="netflix-controls" role="region" aria-label="Contrôles du lecteur">
+            <!-- Top bar -->
+            <div class="n-top">
+              <button class="n-btn n-back" onclick="goBack()" title="Retour" aria-label="Retour"><i class="fas fa-arrow-left"></i></button>
+              <div class="n-title" id="n-video-title" aria-live="polite">StreamVault</div>
+              <div class="n-top-right">
+                <button class="n-btn" onclick="toggleSidebarSection('playlist-block')" title="Playlist" aria-label="Afficher la playlist" aria-expanded="false" aria-controls="playlist-block"><i class="fas fa-list"></i></button>
+                <button class="n-btn" onclick="toggleSidebarSection('sidebar-queue-block')" title="Queue" aria-label="Afficher la queue" aria-expanded="false" aria-controls="sidebar-queue-block"><i class="fas fa-layer-group"></i></button>
+                <button class="n-btn" onclick="toggleSidebarSection('diag-settings')" title="Diagnostic & Paramètres" aria-label="Afficher les paramètres" aria-expanded="false" aria-controls="diag-settings"><i class="fas fa-cog"></i></button>
+              </div>
+            </div>
+
+            <!-- Middle controls (Play/Pause/Seek) -->
+            <div class="n-middle">
+              <button class="n-btn n-big" onclick="nSeek(-10)" title="Reculer 10s" aria-label="Reculer de 10 secondes"><i class="fas fa-backward"></i></button>
+              <button class="n-btn n-play-pause" id="n-play-pause-big" onclick="nTogglePlay()" aria-label="Lecture / Pause"><i class="fas fa-play"></i></button>
+              <button class="n-btn n-big" onclick="nSeek(10)" title="Avancer 10s" aria-label="Avancer de 10 secondes"><i class="fas fa-forward"></i></button>
+            </div>
+
+            <!-- Bottom controls -->
+            <div class="n-bottom">
+              <!-- Progress bar -->
+              <div class="n-progress-container" id="n-progress-container"
+                   role="slider" aria-label="Position de lecture"
+                   aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+                   tabindex="0">
+                <div class="n-progress-bar">
+                  <div class="n-progress-fill" id="n-progress-fill"></div>
+                  <div class="n-progress-handle"></div>
+                </div>
+              </div>
+
+              <div class="n-bottom-controls">
+                <div class="n-left">
+                  <button class="n-btn" onclick="nTogglePlay()" id="n-play-btn" aria-label="Lecture / Pause"><i class="fas fa-play"></i></button>
+                  <button class="n-btn" onclick="nSeek(-10)" aria-label="Reculer 10s"><i class="fas fa-rotate-left"></i></button>
+                  <button class="n-btn" onclick="nSeek(10)" aria-label="Avancer 10s"><i class="fas fa-rotate-right"></i></button>
+
+                  <div class="n-volume-group">
+                    <button class="n-btn" id="n-volume-btn" onclick="nToggleMute()" aria-label="Couper le son"><i class="fas fa-volume-up"></i></button>
+                    <input type="range" class="n-volume-slider" id="n-volume-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume">
+                  </div>
+
+                  <div class="n-time" aria-live="off">
+                    <span id="n-current-time">0:00</span> / <span id="n-duration">0:00</span>
+                  </div>
+                </div>
+
+                <div class="n-right">
+                  <button class="n-btn" id="n-next-btn" onclick="playNextPlaylistItem()" title="Suivant" aria-label="Vidéo suivante"><i class="fas fa-step-forward"></i></button>
+                  <button class="n-btn" onclick="openVfp()" title="Audio & Sous-titres" aria-label="Options audio et sous-titres"><i class="fas fa-closed-captioning"></i></button>
+                  <button class="n-btn" onclick="nToggleFullscreen()" title="Plein écran" aria-label="Plein écran"><i class="fas fa-expand"></i></button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <iframe id="embed-iframe"
             style="display:none;position:absolute;inset:0;width:100%;height:100%;border:none;"
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
@@ -287,14 +347,23 @@
         <div class="subs-list" id="subs-list"></div>
       </div>
 
-      <!-- Diagnostic -->
-      <div class="sidebar-block">
-        <div class="sidebar-block-title-row">
-          <span class="sidebar-block-title">Diagnostic</span>
-          <button class="btn-tiny" onclick="clearDiag()">Effacer</button>
+      <!-- Diagnostic & Settings grouped -->
+      <div id="diag-settings" style="display:none">
+        <!-- Diagnostic -->
+        <div class="sidebar-block">
+          <div class="sidebar-block-title-row">
+            <span class="sidebar-block-title">Diagnostic</span>
+            <button class="btn-tiny" onclick="clearDiag()">Effacer</button>
+          </div>
+          <div class="diag-log" id="diag-log">
+            <div class="diag-empty">Lance une vidéo.</div>
+          </div>
         </div>
-        <div class="diag-log" id="diag-log">
-          <div class="diag-empty">Lance une vidéo.</div>
+
+        <!-- Quality/Method bars moved here for "Settings" feel -->
+        <div id="sidebar-methods" class="sidebar-block" style="margin-top:10px">
+          <div class="sidebar-block-title">Méthodes & Qualité</div>
+          <div id="sidebar-method-content" style="padding:10px"></div>
         </div>
       </div>
 
