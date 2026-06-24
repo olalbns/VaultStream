@@ -34,20 +34,20 @@ async function refreshYtdlAuthStatus() {
 async function saveYtdlCookiesFromUi() {
   const textarea = document.getElementById('yt-cookies-input');
   const text = textarea?.value.trim();
-  if (!text) { toast('Colle un fichier cookies Netscape', '⚠'); return; }
+  if (!text) { toast('Colle un fichier cookies Netscape', '<i class="fas fa-exclamation-triangle"></i>'); return; }
   const data = await API.saveYtdlCookies(text);
-  if (!data.ok) { toast(`Erreur: ${data.error || '?'}`, '✗'); return; }
+  if (!data.ok) { toast(`Erreur: ${data.error || '?'}`, '<i class="fas fa-times"></i>'); return; }
   await refreshYtdlAuthStatus();
-  toast('Cookies sauvegardés', '✓');
+  toast('Cookies sauvegardés', '<i class="fas fa-check"></i>');
 }
 
 async function clearYtdlCookiesFromUi() {
   const textarea = document.getElementById('yt-cookies-input');
   const data = await API.clearYtdlCookies();
-  if (!data.ok) { toast(`Erreur: ${data.error || '?'}`, '✗'); return; }
+  if (!data.ok) { toast(`Erreur: ${data.error || '?'}`, '<i class="fas fa-times"></i>'); return; }
   if (textarea) textarea.value = '';
   await refreshYtdlAuthStatus();
-  toast('Cookies supprimés', '✓');
+  toast('Cookies supprimés', '<i class="fas fa-check"></i>');
 }
 
 function extractFirstUrl(text) {
@@ -105,9 +105,9 @@ function renderDlInfo(info) {
   document.getElementById('dl-title').textContent = info.title || 'Sans titre';
 
   const meta = [];
-  if (info.uploader)   meta.push('👤 ' + info.uploader);
-  if (info.duration)   meta.push('⏱ ' + fmtDuration(info.duration));
-  if (info.view_count) meta.push('👁 ' + info.view_count.toLocaleString());
+  if (info.uploader)   meta.push('<i class="fas fa-user"></i> ' + info.uploader);
+  if (info.duration)   meta.push('<i class="fas fa-clock"></i> ' + fmtDuration(info.duration));
+  if (info.view_count) meta.push('<i class="fas fa-eye"></i> ' + info.view_count.toLocaleString());
   document.getElementById('dl-meta').textContent = meta.join('  ·  ');
 
   // Video formats
@@ -130,9 +130,9 @@ function renderDlInfo(info) {
     '<div class="fmt-detail">192kbps</div></div>' +
     `<div class="fmt-actions">
       <button class="btn-primary" style="font-size:11px;padding:7px 14px"
-        onclick="startDownload('${esc(_dlUrl)}','bestaudio','mp3')">↓ MP3</button>
+        onclick="startDownload('${esc(_dlUrl)}','bestaudio','mp3')"><i class="fas fa-download"></i> MP3</button>
       <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
-        onclick="startDownload('${esc(_dlUrl)}','bestaudio','m4a')">↓ M4A</button>
+        onclick="startDownload('${esc(_dlUrl)}','bestaudio','m4a')"><i class="fas fa-download"></i> M4A</button>
     </div></div>` +
     audioFmts.map(f => makeFormatRow(f, _dlUrl)).join('');
 
@@ -148,9 +148,9 @@ function renderDlInfo(info) {
           </div>
           <div class="fmt-actions">
             <button class="btn-primary" style="font-size:11px;padding:7px 14px"
-              onclick="startSubDownload('${esc(_dlUrl)}','${s.lang}','${s.ext}')">↓ Télécharger</button>
+              onclick="startSubDownload('${esc(_dlUrl)}','${s.lang}','${s.ext}')"><i class="fas fa-download"></i> Télécharger</button>
             <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
-              onclick="window.open('/api/proxy?url='+encodeURIComponent('${esc(s.url)}'))">👁 Voir</button>
+              onclick="window.open('/api/proxy?url='+encodeURIComponent('${esc(s.url)}'))"><i class="fas fa-eye"></i> Voir</button>
           </div>
         </div>`).join('');
   } else {
@@ -183,19 +183,19 @@ function makeFormatRow(f, url) {
       <div class="fmt-actions">
         <button class="btn-primary" style="font-size:11px;padding:7px 14px"
           onclick="startDownload('${esc(url)}','${f.id}','${f.ext||'mp4'}')">
-          ↓ ${f.ext?.toUpperCase()||'DL'}
+          <i class="fas fa-download"></i> ${f.ext?.toUpperCase()||'DL'}
         </button>
         ${f.type==='video+audio'||f.type==='video' ?`
         <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
           onclick="startDownload('${esc(url)}','${f.id}','mp4')">
-          ↓ MP4
+          <i class="fas fa-download"></i> MP4
         </button>` : ''}
       </div>
     </div>`;
 }
 
 async function startDownload(url, formatId, ext) {
-  toast('Démarrage du téléchargement…', '↓');
+  toast('Démarrage du téléchargement…', '<i class="fas fa-download"></i>');
   try {
     const res = await API.fetch('/api/ytdl/download', {
       method: 'POST',
@@ -203,18 +203,18 @@ async function startDownload(url, formatId, ext) {
       body: JSON.stringify({ url, format_id: formatId, ext }),
     });
     const data = await res.json();
-    if (!data.ok) { toast('Erreur : ' + data.error, '✗'); return; }
+    if (!data.ok) { toast('Erreur : ' + data.error, '<i class="fas fa-times"></i>'); return; }
 
-    toast('↓ Téléchargement démarré', '✓');
+    toast('<i class="fas fa-download"></i> Téléchargement démarré', '<i class="fas fa-check"></i>');
     trackDownload(data.id);
     refreshDlList();
   } catch (e) {
-    toast('Erreur : ' + e.message, '✗');
+    toast('Erreur : ' + e.message, '<i class="fas fa-times"></i>');
   }
 }
 
 async function startSubDownload(url, lang, ext) {
-  toast('Téléchargement sous-titres…', '📝');
+  toast('Téléchargement sous-titres…', '<i class="fas fa-file-alt"></i>');
   try {
     const res = await API.fetch('/api/ytdl/download', {
       method: 'POST',
@@ -222,8 +222,8 @@ async function startSubDownload(url, lang, ext) {
       body: JSON.stringify({ url, format_id: 'bestaudio', ext: 'm4a', sub_lang: lang }),
     });
     const data = await res.json();
-    if (data.ok) { toast('Sous-titres en téléchargement', '✓'); trackDownload(data.id); refreshDlList(); }
-  } catch (e) { toast('Erreur : ' + e.message, '✗'); }
+    if (data.ok) { toast('Sous-titres en téléchargement', '<i class="fas fa-check"></i>'); trackDownload(data.id); refreshDlList(); }
+  } catch (e) { toast('Erreur : ' + e.message, '<i class="fas fa-times"></i>'); }
 }
 
 function trackDownload(dlId) {
@@ -260,10 +260,10 @@ function updateDlItem(dl) {
     actionsEl.innerHTML = `
       <a href="/api/downloads/file?f=${encodeURIComponent(dl.filename)}" download
         class="btn-primary" style="font-size:11px;padding:7px 16px;text-decoration:none">
-        ↓ Sauvegarder
+        <i class="fas fa-download"></i> Sauvegarder
       </a>
       <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
-        onclick="playDownloaded('${esc(dl.filename)}')">▶ Lire</button>`;
+        onclick="playDownloaded('${esc(dl.filename)}')"><i class="fas fa-play"></i> Lire</button>`;
   }
 }
 
@@ -310,16 +310,16 @@ function renderDlList(data) {
         <span class="dl-progress-eta">${dl.eta?'ETA: '+dl.eta:''}</span>
         <span>${dl.size||''}</span>
       </div>
-      ${dl.error ?`<div style="font-size:11px;color:#ff6060;margin-top:6px">✗ ${esc(dl.error)}</div>` : ''}
+      ${dl.error ?`<div style="font-size:11px;color:#ff6060;margin-top:6px"><i class="fas fa-times"></i> ${esc(dl.error)}</div>` : ''}
       <div class="dl-item-actions">
         ${dl.status==='done'&&dl.filename ?`
           <a href="/api/downloads/file?f=${encodeURIComponent(dl.filename)}" download
-            class="btn-primary" style="font-size:11px;padding:7px 16px;text-decoration:none">↓ Sauvegarder</a>
+            class="btn-primary" style="font-size:11px;padding:7px 16px;text-decoration:none"><i class="fas fa-download"></i> Sauvegarder</a>
           <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
-            onclick="playDownloaded('${esc(dl.filename)}')">▶ Lire</button>` : ''}
+            onclick="playDownloaded('${esc(dl.filename)}')"><i class="fas fa-play"></i> Lire</button>` : ''}
         ${dl.status==='error' ?`
           <button class="btn-primary" style="font-size:11px;padding:7px 14px"
-            onclick="retryDl('${dl.id}')">↺ Réessayer</button>` : ''}
+            onclick="retryDl('${dl.id}')"><i class="fas fa-sync"></i> Réessayer</button>` : ''}
         ${dl.status==='downloading' ?`
           <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
             onclick="cancelDl('${dl.id}')">✕ Annuler</button>` : ''}
@@ -340,21 +340,21 @@ async function cancelDl(id) {
 }
 
 async function retryDl(id) {
-  toast('Relance du téléchargement...', '↺');
+  toast('Relance du téléchargement...', '<i class="fas fa-sync"></i>');
   const data = await API.retryDownload(id);
   if (data.ok) {
-    toast('Relancé !', '✓');
+    toast('Relancé !', '<i class="fas fa-check"></i>');
     trackDownload(id);
     refreshDlList();
   } else {
-    toast('Erreur: ' + data.error, '✗');
+    toast('Erreur: ' + data.error, '<i class="fas fa-times"></i>');
   }
 }
 
 function playDownloaded(filename) {
   const url = `/api/downloads/file?f=${encodeURIComponent(filename)}`;
   showPage('player');
-  document.getElementById('nav-player-li').style.display = 'block';
+  document.getElementById('nav-player-link').style.display = 'block';
   Player.load(url);
 }
 
@@ -389,7 +389,7 @@ let _selectedItems = new Set();
 
 async function analyzeDl() {
   const raw = document.getElementById('dl-url-input').value.trim();
-  if (!raw) { toast('Colle un lien', '⚠'); return; }
+  if (!raw) { toast('Colle un lien', '<i class="fas fa-exclamation-triangle"></i>'); return; }
   const url = normalizeYoutubeDlUrl(raw);
   document.getElementById('dl-url-input').value = url;
   _dlUrl = url;
@@ -401,7 +401,7 @@ async function analyzeDl() {
   document.getElementById('dl-playlist-section').style.display = 'none';
   _dlPlaylist = null; _selectedItems.clear();
 
-  toast('Analyse en cours…', '⏳');
+  toast('Analyse en cours…', '<i class="fas fa-spinner fa-spin"></i>');
 
   try {
     // Check if playlist first
@@ -421,21 +421,21 @@ async function analyzeDl() {
       _dlPlaylist = plData;
       renderDlPlaylist(plData);
       document.getElementById('dl-playlist-section').style.display = 'block';
-      toast(`✓ Playlist : ${plData.count} vidéos`, '✓');
+      toast(`<i class="fas fa-check"></i> Playlist : ${plData.count} vidéos`, '<i class="fas fa-check"></i>');
     } else if (infoData?.bot_check) {
       await refreshYtdlAuthStatus();
-      toast(infoData.error || 'YouTube demande une vérification anti-bot', '⚠');
+      toast(infoData.error || 'YouTube demande une vérification anti-bot', '<i class="fas fa-exclamation-triangle"></i>');
     } else if (infoData?.ok) {
       // Single video
       _dlInfo = infoData;
       renderDlInfo(infoData);
       document.getElementById('dl-info-panel').style.display = 'block';
-      toast(`✓ ${infoData.formats.length} formats`, '✓');
+      toast(`<i class="fas fa-check"></i> ${infoData.formats.length} formats`, '<i class="fas fa-check"></i>');
     } else {
-      toast('Impossible d\'analyser ce lien', '✗');
+      toast('Impossible d\'analyser ce lien', '<i class="fas fa-times"></i>');
     }
   } catch(e) {
-    toast('Erreur : ' + e.message, '✗');
+    toast('Erreur : ' + e.message, '<i class="fas fa-times"></i>');
   } finally {
     btn.disabled = false; btn.textContent = 'Analyser';
   }
@@ -460,8 +460,8 @@ function renderDlPlaylist(pl) {
         <div class="dl-pl-meta">${item.duration?fmtDuration(item.duration):''}</div>
       </div>
       <div class="dl-pl-actions">
-        <button class="btn-tiny" onclick="startDownload('${esc(item.url)}','best','mp4')">↓</button>
-        <button class="btn-tiny" onclick="playPlaylistItemDl(${i})">▶</button>
+        <button class="btn-tiny" onclick="startDownload('${esc(item.url)}','best','mp4')"><i class="fas fa-download"></i></button>
+        <button class="btn-tiny" onclick="playPlaylistItemDl(${i})"><i class="fas fa-play"></i></button>
       </div>
     </div>`).join('');
 }
@@ -502,12 +502,12 @@ async function dlPlaylistAll() {
 
 async function dlPlaylistSelected() {
   const items = getSelectedPlaylistItems();
-  if (!items.length) { toast('Sélectionne au moins une vidéo', '⚠'); return; }
+  if (!items.length) { toast('Sélectionne au moins une vidéo', '<i class="fas fa-exclamation-triangle"></i>'); return; }
   await batchDownload(items.map(i => i.url));
 }
 
 async function batchDownload(urls) {
-  toast(`↓ ${urls.length} téléchargements démarrés`, '↓');
+  toast(`<i class="fas fa-download"></i> ${urls.length} téléchargements démarrés`, '<i class="fas fa-download"></i>');
   const res = await API.fetch('/api/ytdl/download/batch', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ urls, format_id:'best', ext:'mp4' }),
@@ -531,13 +531,13 @@ async function addPlaylistToQueue() {
     });
   }
   await loadQueue();
-  toast(`${_dlPlaylist.items.length} vidéos → Queue`, '≡');
+  toast(`${_dlPlaylist.items.length} vidéos → Queue`, '<i class="fas fa-list-ul"></i>');
 }
 
 function playPlaylistItemDl(idx) {
   if (!_dlPlaylist?.items?.[idx]) return;
   const item = _dlPlaylist.items[idx];
   showPage('player');
-  document.getElementById('nav-player-li').style.display = 'block';
+  document.getElementById('nav-player-link').style.display = 'block';
   Player.load(item.url);
 }

@@ -55,7 +55,7 @@ async function globalSearch() {
       card.className = 'video-card';
       const thumb = v.thumbnail
         ?`<img src="${v.thumbnail}" alt="" loading="lazy">`
-        : `<span class="card-thumb-icon">🎞</span>`;
+        : `<span class="card-thumb-icon"><i class="fas fa-film"></i></span>`;
       card.innerHTML = `
         <div class="card-thumb">${thumb}
           <div class="card-play-hover">
@@ -214,7 +214,7 @@ function downloadCurrent() {
   // Otherwise open downloader page with URL pre-filled
   document.getElementById('dl-url-input').value = url;
   showPage('downloader');
-  toast('URL copiée dans le téléchargeur', '↓');
+  toast('URL copiée dans le téléchargeur', '<i class="fas fa-download"></i>');
 }
 
 function openInTab() {
@@ -225,7 +225,7 @@ function openInTab() {
 function copyCurrentUrl() {
   const url = Player.currentUrl;
   if (!url) return;
-  navigator.clipboard.writeText(url).then(() => toast('⎘ URL copiée !', '⎘'));
+  navigator.clipboard.writeText(url).then(() => toast('<i class="fas fa-copy"></i> URL copiée !', '<i class="fas fa-copy"></i>'));
 }
 
 function clearDiag() { Player.clearDiag(); }
@@ -254,14 +254,14 @@ function getYtIdFromUrl(url) {
 function makeCardThumb(h) {
   const ytId = getYtIdFromUrl(h.url);
   if (ytId) return `<img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.display='none'">`;
-  return `<span class="card-thumb-icon">🎞</span>`;
+  return `<span class="card-thumb-icon"><i class="fas fa-film"></i></span>`;
 }
 
 function makeVideoCard(h, showDel = false) {
   const ytId = getYtIdFromUrl(h.url);
   const thumb = ytId
     ?`<img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.display='none'">`
-    : `<span class="card-thumb-icon">🎞</span>`;
+    : `<span class="card-thumb-icon"><i class="fas fa-film"></i></span>`;
   const del = showDel
     ?`<button class="card-del" onclick="deleteAndRefresh(event,'${esc(h.id)}')" title="Supprimer">✕</button>` : '';
   return `
@@ -322,7 +322,7 @@ function renderSidebarHistory(history) {
     const ytId = getYtIdFromUrl(h.url);
     const thumb = ytId
       ?`<img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" alt="" loading="lazy" onerror="this.style.display='none'">`
-      : `<span class="sh-thumb-icon">🎞</span>`;
+      : `<span class="sh-thumb-icon"><i class="fas fa-film"></i></span>`;
     return `<div class="sh-item" onclick="replayFromHistory('${esc(h.url)}')">
       <div class="sh-thumb">${thumb}</div>
       <div class="sh-info">
@@ -345,7 +345,7 @@ async function renderLibrary(history) {
     : history;
   if (!filtered.length) {
     grid.innerHTML = `<div class="lib-empty">
-      <div class="lib-empty-icon">🎞</div>
+      <div class="lib-empty-icon"><i class="fas fa-film"></i></div>
       <p>${_libFilter ?'Aucun résultat pour "'+esc(_libFilter)+'"' : 'Aucune vidéo dans l\'historique'}</p>
       <button class="btn-primary" onclick="showPage('home')">Ajouter une vidéo</button>
     </div>`; return;
@@ -360,14 +360,14 @@ function filterLibrary(val) {
 
 async function replayFromHistory(url) {
   document.getElementById('main-url-input').value = url;
-  document.getElementById('sidebar-url-input').value = url;
   showPage('player');
-  document.getElementById('nav-player-li').style.display = 'block';
+  const navLink = document.getElementById('nav-player-link');
+  if (navLink) navLink.style.display = 'block';
   try {
     await Player.load(url);
     await refreshAllHistory();
-    toast('▶ Relecture', '✓');
-  } catch { toast('Lecture impossible', '✗'); }
+    toast('Relecture', '<i class="fas fa-play"></i>');
+  } catch { toast('Lecture impossible', '<i class="fas fa-times"></i>'); }
 }
 
 async function deleteAndRefresh(e, id) {
@@ -376,7 +376,7 @@ async function deleteAndRefresh(e, id) {
   await refreshAllHistory();
   if (document.getElementById('page-library').classList.contains('active'))
     renderLibrary(_allHistory);
-  toast('Supprimé', '🗑');
+  toast('Supprimé', '<i class="fas fa-trash"></i>');
 }
 
 async function clearAllHistory() {
@@ -386,19 +386,19 @@ async function clearAllHistory() {
   _allHistory = [];
   await refreshAllHistory();
   renderLibrary([]);
-  toast('Historique effacé', '✓');
+  toast('Historique effacé', '<i class="fas fa-check"></i>');
 }
 
 // ── Toast ──────────────────────────────────────────────
 let _toastTimer;
-function toast(msg, icon = '✓') {
+function toast(msg, icon = '<i class="fas fa-check"></i>') {
   const el = document.getElementById('toast');
   const msgEl = document.getElementById('toast-msg');
   const iconEl = document.getElementById('toast-icon');
   if (!el || !msgEl || !iconEl) return;
 
-  msgEl.textContent = msg;
-  iconEl.textContent = icon;
+  msgEl.innerHTML = msg;
+  iconEl.innerHTML = icon;
 
   el.classList.add('show');
   clearTimeout(_toastTimer);
@@ -411,16 +411,16 @@ setInterval(async () => {
     const res  = await API.fetch('/api/intercept/latest');
     const data = await res.json();
     if (data?.url) {
-      document.getElementById('main-url-input').value    = data.url;
-      document.getElementById('sidebar-url-input').value = data.url;
+      document.getElementById('main-url-input').value = data.url;
       showPage('player');
-      document.getElementById('nav-player-li').style.display = 'block';
+      const navLink = document.getElementById('nav-player-link');
+      if (navLink) navLink.style.display = 'block';
       setTimeout(async () => {
         try {
           await Player.load(data.url);
           await refreshAllHistory();
-          toast('▶ Vidéo reçue via extension', '🔌');
-        } catch { toast('Extension: lecture impossible', '✗'); }
+          toast('Vidéo reçue via extension', '<i class="fas fa-plug"></i>');
+        } catch { toast('Extension: lecture impossible', '<i class="fas fa-times"></i>'); }
       }, 100);
     }
   } catch {}
@@ -453,7 +453,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       case 'k': // YouTube style
         e.preventDefault();
         v.paused ? v.play() : v.pause();
-        toast(v.paused ? 'Pause' : 'Lecture', v.paused ? '⏸' : '▶');
+        toast(v.paused ? 'Pause' : 'Lecture', v.paused ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>');
         break;
       case 'f':
         e.preventDefault();
@@ -465,7 +465,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         break;
       case 'm':
         v.muted = !v.muted;
-        toast(v.muted ? 'Muet' : 'Son activé', v.muted ? '🔇' : '🔊');
+        toast(v.muted ? 'Muet' : 'Son activé', v.muted ? '<i class="fas fa-volume-mute"></i>' : '<i class="fas fa-volume-up"></i>');
         break;
       case 'j':
       case 'arrowleft':
@@ -509,7 +509,8 @@ async function loadFromHome() {
 
   try {
     showPage('player');
-    document.getElementById('nav-player-li').style.display = 'block';
+    const navLink = document.getElementById('nav-player-link');
+    if (navLink) navLink.style.display = 'block';
     // Reset playlist state
     window._playlist = null; window._playlistIdx = -1;
     const pb = document.getElementById('playlist-block');
@@ -532,11 +533,9 @@ async function loadFromHome() {
     }
 
     setHint('');
-    const sbInp = document.getElementById('sidebar-url-input');
-    if (sbInp) sbInp.value = url;
     await refreshAllHistory();
     await renderSidebarQueue();
-    toast('▶ Lecture démarrée', '✓');
+    toast('<i class="fas fa-play"></i> Lecture démarrée', '<i class="fas fa-check"></i>');
   } catch {
     showPage('home');
     setHint('Impossible de lire. Vérifie le lien.', 'error');
@@ -545,21 +544,6 @@ async function loadFromHome() {
   }
 }
 
-async function loadFromSidebar() {
-  const rawUrl = document.getElementById('sidebar-url-input')?.value.trim();
-  const url = normalizeYoutubeUrl(rawUrl);
-  if (!url || !isValidInput(url)) { toast('Lien invalide', '⚠'); return; }
-  window._playlist=null; window._playlistIdx=-1;
-  hideNextBar();
-  const pb=document.getElementById('playlist-block'); if(pb) pb.style.display='none';
-  try {
-    await Player.load(url);
-    await refreshAllHistory();
-    await renderSidebarQueue();
-    toast('▶ Nouvelle vidéo', '✓');
-    loadPlaylist(url).catch(()=>{});
-  } catch { toast('Lecture impossible', '✗'); }
-}
 
 // ── Collections page ──────────────────────────────────
 // showPage already calls loadCollections() when page=collections via the page handler

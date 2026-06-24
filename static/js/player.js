@@ -111,7 +111,7 @@ const Player = (() => {
     const block = $('subs-block'), list = $('subs-list');
     if (!block || !list || !captions?.length) { if (block) block.style.display = 'none'; return; }
     block.style.display = 'block';
-    list.innerHTML = '<div class="sub-item" onclick="Player.removeSubs()">✕ Aucun</div>' +
+    list.innerHTML = '<div class="sub-item" onclick="Player.removeSubs()"><i class="fas fa-times"></i> Aucun</div>' +
       captions.map((c, i) => `<div class="sub-item" id="sub-${i}" onclick="Player.loadSub('${encodeURIComponent(c.url)}',${i})">
         <span class="sub-lang">${c.name || c.lang}</span><span class="sub-type">${c.ext || 'srt'}</span>
       </div>`).join('');
@@ -252,7 +252,7 @@ const Player = (() => {
       <div class="fmt-info"><div class="fmt-res">Meilleure qualité</div><div class="fmt-detail">Auto sélection</div></div>
       <div class="fmt-actions">
         <button class="btn-primary" style="font-size:11px;padding:6px 12px"
-          onclick="startDownload('${esc(originalUrl)}','best','mp4')">↓ MP4</button>
+          onclick="startDownload('${esc(originalUrl)}','best','mp4')"><i class="fas fa-download"></i> MP4</button>
       </div></div>`;
 
     if ($v) $v.innerHTML = bestRow + videoFmts.map(f => makeVfpRow(f, originalUrl)).join('');
@@ -260,8 +260,8 @@ const Player = (() => {
       <div class="fmt-badge audio">AUDIO</div>
       <div class="fmt-info"><div class="fmt-res">Meilleur audio</div><div class="fmt-detail">Extraction automatique</div></div>
       <div class="fmt-actions">
-        <button class="btn-primary" style="font-size:11px;padding:6px 12px" onclick="startDownload('${esc(originalUrl)}','bestaudio','mp3')">↓ MP3</button>
-        <button class="btn-ghost" style="font-size:11px;padding:6px 10px" onclick="startDownload('${esc(originalUrl)}','bestaudio','m4a')">↓ M4A</button>
+        <button class="btn-primary" style="font-size:11px;padding:6px 12px" onclick="startDownload('${esc(originalUrl)}','bestaudio','mp3')"><i class="fas fa-download"></i> MP3</button>
+        <button class="btn-ghost" style="font-size:11px;padding:6px 10px" onclick="startDownload('${esc(originalUrl)}','bestaudio','m4a')"><i class="fas fa-download"></i> M4A</button>
       </div></div>`+ audioFmts.map(f => makeVfpRow(f, originalUrl)).join('');
 
     if ($s) $s.innerHTML = subs.length
@@ -271,9 +271,9 @@ const Player = (() => {
           <div class="fmt-detail">${s.lang}${s.auto ? ' · auto' : ''}</div></div>
           <div class="fmt-actions">
             <button class="btn-primary" style="font-size:11px;padding:6px 12px"
-              onclick="startDownload('${esc(originalUrl)}','bestaudio','m4a','${s.lang}')">↓ Télécharger</button>
+              onclick="startDownload('${esc(originalUrl)}','bestaudio','m4a','${s.lang}')"><i class="fas fa-download"></i> Télécharger</button>
             <button class="btn-ghost" style="font-size:11px;padding:6px 10px"
-              onclick="Player.loadSub('${encodeURIComponent(s.url)}',0)">▶ Activer</button>
+              onclick="Player.loadSub('${encodeURIComponent(s.url)}',0)"><i class="fas fa-play"></i> Activer</button>
           </div></div>`).join('')
       : '<div class="diag-empty" style="padding:12px">Aucun sous-titre.</div>';
   }
@@ -292,7 +292,7 @@ const Player = (() => {
       <span class="fmt-size">${f.filesize_str || ''}</span>
       <div class="fmt-actions">
         <button class="btn-primary" style="font-size:11px;padding:6px 12px"
-          onclick="startDownload('${esc(url)}','${f.id}','${f.ext || 'mp4'}')">↓</button>
+          onclick="startDownload('${esc(url)}','${f.id}','${f.ext || 'mp4'}')"><i class="fas fa-download"></i></button>
       </div></div>`;
   }
 
@@ -305,7 +305,7 @@ const Player = (() => {
         const data = await res.json();
         updateDlBar(data);
         if (data.status === 'done') { clearInterval(_dlBarPoll); _dlBarFile = data.filename; showDlBarSave(data.filename, data.title); }
-        else if (['error', 'cancelled'].includes(data.status)) { clearInterval(_dlBarPoll); hideDlBar(); toast(data.error || 'Annulé', '✗'); }
+        else if (['error', 'cancelled'].includes(data.status)) { clearInterval(_dlBarPoll); hideDlBar(); toast(data.error || 'Annulé', '<i class="fas fa-times"></i>'); }
       } catch { clearInterval(_dlBarPoll); }
     }, 800);
   }
@@ -328,7 +328,7 @@ const Player = (() => {
   }
   function showDlBarSave(filename, title) {
     const btn = $('dl-bar-save-btn'); if (btn) btn.style.display = '';
-    $('dl-bar-title').textContent = '✓ ' + (title || filename || 'Téléchargé');
+    $('dl-bar-title').textContent = '<i class="fas fa-check"></i> ' + (title || filename || 'Téléchargé');
     $('dl-bar-fill').style.width = '100%';
     $('dl-bar-pct').textContent = '100%';
     $('dl-bar-meta').textContent = 'Prêt à sauvegarder';
@@ -377,7 +377,7 @@ const Player = (() => {
         track.kind = 'subtitles'; track.src = `/api/proxy?url=${encodeURIComponent(url)}`; track.default = true;
         vid().innerHTML = ''; vid().appendChild(track);
         document.querySelectorAll('.sub-item').forEach((el, i) => el.classList.toggle('active', i === idx + 1));
-        toast('Sous-titres chargés', '📝');
+        toast('Sous-titres chargés', '<i class="fas fa-file-alt"></i>');
       } catch (e) { pub.diag('warn', 'Sous-titres', e.message); }
     },
     removeSubs() {
@@ -392,11 +392,11 @@ const Player = (() => {
       const btn = document.getElementById('btn-cinema');
       if (_cinemaActive) {
         if (backdrop) backdrop.style.display = 'block';
-        if (btn) btn.textContent = '✕ Quitter cinéma';
+        if (btn) btn.textContent = '<i class="fas fa-times"></i> Quitter cinéma';
         const v = vid(); if (v && v.paused) v.play().catch(() => { });
       } else {
         if (backdrop) backdrop.style.display = 'none';
-        if (btn) btn.textContent = '⛶ Cinéma';
+        if (btn) btn.textContent = '<i class="fas fa-expand"></i> Cinéma';
       }
     },
     quickDownload() {
@@ -408,9 +408,9 @@ const Player = (() => {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, format_id: 'best', ext: 'mp4' }),
       }).then(r => r.json()).then(data => {
-        if (!data.ok) { hideDlBar(); toast('Erreur: ' + (data.error || '?'), '✗'); return; }
+        if (!data.ok) { hideDlBar(); toast('Erreur: ' + (data.error || '?'), '<i class="fas fa-times"></i>'); return; }
         _dlBarId = data.id; pollDlBar();
-      }).catch(e => { hideDlBar(); toast('Erreur: ' + e.message, '✗'); });
+      }).catch(e => { hideDlBar(); toast('Erreur: ' + e.message, '<i class="fas fa-times"></i>'); });
     },
 
     saveDlFile() {
@@ -455,7 +455,7 @@ const Player = (() => {
         _method = 'TRANSCODE (FFMPEG)';
         setBar(_method, url);
         unspin();
-        toast('✓ Transcodage actif', '✓');
+        toast('<i class="fas fa-check"></i> Transcodage actif', '<i class="fas fa-check"></i>');
       } catch (e) {
         showErr('Échec du transcodage: ' + e.message);
       }
@@ -524,7 +524,7 @@ const Player = (() => {
         } else {
           let success = false;
           for (const fn of [tryResolve, tryProxy, tryBlobProxy, tryNative]) {
-            try { method = await fn(rawUrl); success = true; pub.diag('ok', `✓ ${method}`); break; }
+            try { method = await fn(rawUrl); success = true; pub.diag('ok', `<i class="fas fa-check"></i> ${method}`); break; }
             catch (err) { pub.diag('fail', 'Échec', err.message.slice(0, 150)); }
           }
           if (!success) throw new Error('Toutes les méthodes ont échoué.');
@@ -877,7 +877,7 @@ async function renderSidebarQueue() {
       <div class="sq-item ${q.played ? '' : ''}">
         <div class="sq-num">${i + 1}</div>
         <div class="sq-title" onclick="replayFromHistory('${escHtml(q.url)}')">${escHtml(getDomain(q.url))}</div>
-        <button class="sq-del" onclick="removeFromSidebarQueue('${q.id}')">✕</button>
+        <button class="sq-del" onclick="removeFromSidebarQueue('${q.id}')"><i class="fas fa-times"></i></button>
       </div>`).join('');
   } catch { }
 }
