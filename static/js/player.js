@@ -539,6 +539,31 @@ const Player = (() => {
 
 
 
+  // ── Casting ──────────────────────────────────────────
+  window.__onGCastApiAvailable = function(isAvailable) {
+    if (isAvailable) {
+      cast.framework.CastContext.getInstance().setOptions({
+        receiverApplicationId: chrome.cast.media.DEFAULT_RECEIVER_APP_ID,
+        autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+      });
+
+      const context = cast.framework.CastContext.getInstance();
+      context.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, (event) => {
+        if (event.sessionState === cast.framework.SessionState.SESSION_STARTED) {
+          const session = context.getCurrentSession();
+          if (session && _url) {
+            const mediaInfo = new chrome.cast.media.MediaInfo(
+              window.location.origin + `/api/proxy?url=${encodeURIComponent(_url)}`,
+              'video/mp4'
+            );
+            const request = new chrome.cast.media.LoadRequest(mediaInfo);
+            session.loadMedia(request);
+          }
+        }
+      });
+    }
+  };
+
   // Video ended → auto next
   document.addEventListener('DOMContentLoaded', () => {
     const v = document.getElementById('main-video');
@@ -560,6 +585,36 @@ function hideDlBar() { Player.hideDlBar(); }
 function setVfpTab(n, b) { Player.setVfpTab(n, b); }
 function closeVfp() { Player.closeVfp(); }
 function transcodeCurrent() { Player.transcodeCurrent(); }
+
+async function loadExternalSub() {
+  const url = document.getElementById('external-sub-url')?.value.trim();
+  if (!url) return;
+  try {
+    const encoded = encodeURIComponent(url);
+    const convertUrl = `/api/subtitles/convert?url=${encoded}`;
+    await Player.loadSub(encodeURIComponent(convertUrl), -1);
+    document.getElementById('external-sub-url').value = '';
+  } catch (e) {
+    toast('Erreur sous-titres', '✗');
+  }
+}
+
+function uploadExternalSub(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    let content = e.target.result;
+    if (file.name.toLowerCase().endsWith('.srt')) {
+      content = 'WEBVTT\n\n' + content.replace(/,/g, '.');
+    }
+    const blob = new Blob([content], { type: 'text/vtt' });
+    const url = URL.createObjectURL(blob);
+    Player.loadSub(encodeURIComponent(url), -1);
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
 
 // ── Playlist support ─────────────────────────────────
 window._playlist = null;

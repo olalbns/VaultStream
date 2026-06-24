@@ -1,5 +1,8 @@
 {
+  "name": "streamvault",
+  "version": "1.0.0",
   "dependencies": {
-    "puppeteer": "^24.40.0"
+    "puppeteer": "^24.40.0",
+    "webtorrent": "^2.4.3"
   }
 }

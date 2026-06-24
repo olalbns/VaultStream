@@ -95,6 +95,15 @@ const API = {
     }
   },
 
+  async getMetadata(query) {
+    try {
+      const res = await this.fetch(`${API.BASE}/api/metadata?q=${encodeURIComponent(query)}`);
+      return await res.json();
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  },
+
   /**
    * Réessaye un téléchargement échoué
    */

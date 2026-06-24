@@ -9,8 +9,8 @@ function showPage(name) {
   const target = document.getElementById(`page-${name}`);
   if (target) target.classList.add('active');
   
-  // Mise à jour de l'état actif (inclut le support pour les icônes sur mobile)
-  document.querySelectorAll('.nav-links a[data-page]').forEach(a => {
+  // Update sidebar active state
+  document.querySelectorAll('.nav-item[data-page]').forEach(a => {
     a.classList.toggle('active', a.dataset.page === name);
   });
 
@@ -290,7 +290,28 @@ async function renderHomeRecent(history) {
   if (!section||!row) return;
   if (!history?.length) { section.style.display='none'; return; }
   section.style.display = '';
-  row.innerHTML = history.slice(0,10).map(h => makeVideoCard(h)).join('');
+
+  row.innerHTML = '';
+  for (const h of history.slice(0, 10)) {
+    const cardWrapper = document.createElement('div');
+    cardWrapper.innerHTML = makeVideoCard(h);
+    const card = cardWrapper.firstElementChild;
+    row.appendChild(card);
+
+    // Enrich with metadata
+    if (h.method === 'torrent' || h.title.includes('.') || h.title.length > 10) {
+      API.getMetadata(h.title).then(meta => {
+        if (meta.ok) {
+          const img = card.querySelector('img');
+          if (img) img.src = meta.poster;
+          else {
+            const thumb = card.querySelector('.card-thumb');
+            if (thumb) thumb.innerHTML = `<img src="${meta.poster}" alt="" loading="lazy">` + thumb.innerHTML;
+          }
+        }
+      });
+    }
+  }
 }
 
 function renderSidebarHistory(history) {
@@ -418,6 +439,55 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Polling des téléchargements actifs
   setInterval(refreshDlList, 5000);
+
+  // ── Keyboard Shortcuts ──
+  document.addEventListener('keydown', e => {
+    // Ignore if user is typing in an input or textarea
+    if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
+    const v = document.getElementById('main-video');
+    if (!v) return;
+
+    switch(e.key.toLowerCase()) {
+      case ' ':
+      case 'k': // YouTube style
+        e.preventDefault();
+        v.paused ? v.play() : v.pause();
+        toast(v.paused ? 'Pause' : 'Lecture', v.paused ? '⏸' : '▶');
+        break;
+      case 'f':
+        e.preventDefault();
+        if (!document.fullscreenElement) {
+          v.requestFullscreen().catch(() => toggleCinema());
+        } else {
+          document.exitFullscreen();
+        }
+        break;
+      case 'm':
+        v.muted = !v.muted;
+        toast(v.muted ? 'Muet' : 'Son activé', v.muted ? '🔇' : '🔊');
+        break;
+      case 'j':
+      case 'arrowleft':
+        v.currentTime = Math.max(0, v.currentTime - 10);
+        break;
+      case 'l':
+      case 'arrowright':
+        v.currentTime = Math.min(v.duration, v.currentTime + 10);
+        break;
+      case 'arrowup':
+        e.preventDefault();
+        v.volume = Math.min(1, v.volume + 0.1);
+        break;
+      case 'arrowdown':
+        e.preventDefault();
+        v.volume = Math.max(0, v.volume - 0.1);
+        break;
+      case 'c':
+        toggleCinema();
+        break;
+    }
+  });
 });
 
 // ── Playlist auto-detection on load ──────────────────
