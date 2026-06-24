@@ -1,7 +1,6 @@
 /**
  * StreamVault Player v6
- * Fixes: playlist auto-play, true cinema mode, next bar,
- *        video formats panel, queue in sidebar
+ * Refactored: Netflix-style UI logic integrated into Player module
  */
 const Player = (() => {
   const $ = id => document.getElementById(id);
@@ -11,6 +10,7 @@ const Player = (() => {
   let _url = '', _method = '', _blob = null, _streams = [], _hlsInstance = null;
   let _cinemaActive = false;
   let _dlBarId = null, _dlBarPoll = null, _dlBarFile = null;
+  let _controlsTimeout = null;
 
   // ── Type detection ──────────────────────────────────
   const typeOf = url => {
@@ -176,6 +176,17 @@ const Player = (() => {
     _streams = data.streams || [];
     renderQualityBar(_streams);
     if (data.captions?.length) renderSubtitles(data.captions);
+
+    // Update sidebar settings content
+    const sideMethods = document.getElementById('sidebar-method-content');
+    if (sideMethods) {
+        sideMethods.innerHTML = `
+            <div style="font-size:12px;margin-bottom:10px">
+                <span class="method-chip">${data.method.toUpperCase()}</span>
+            </div>
+        `;
+    }
+
     spin('Proxy streaming…', '1/4');
     resetVideo();
     const v = vid(); v.src = data.proxy_url; v.load();
@@ -231,14 +242,11 @@ const Player = (() => {
   }
 
   function renderVfp(info, originalUrl) {
-    // Video formats
     const videoFmts = (info.formats || []).filter(f => f.type === 'video+audio' || f.type === 'video');
     const audioFmts = (info.formats || []).filter(f => f.type === 'audio');
     const subs = info.subtitles || [];
-
     const $v = $('vfp-formats-video'), $a = $('vfp-formats-audio'), $s = $('vfp-formats-subs');
 
-    // Best option first
     const bestRow = `<div class="vfp-row">
       <div class="fmt-badge both">V+A</div>
       <div class="fmt-info"><div class="fmt-res">Meilleure qualité</div><div class="fmt-detail">Auto sélection</div></div>
@@ -288,9 +296,6 @@ const Player = (() => {
       </div></div>`;
   }
 
-  // ── Download bar ─────────────────────────────────────
-
-
   function pollDlBar() {
     if (_dlBarPoll) clearInterval(_dlBarPoll);
     _dlBarPoll = setInterval(async () => {
@@ -329,9 +334,6 @@ const Player = (() => {
     $('dl-bar-meta').textContent = 'Prêt à sauvegarder';
   }
 
-  // ── Cinema mode ──────────────────────────────────────
-
-
   function fmtBytes(b) {
     if (!b) return '';
     if (b < 1048576) return (b / 1024).toFixed(0) + 'Ko';
@@ -343,6 +345,7 @@ const Player = (() => {
   const pub = {
     get currentUrl() { return _url; },
     get currentMethod() { return _method; },
+    get isCinema() { return _cinemaActive; },
 
     diag(type, title, detail = '') {
       const log = $('diag-log'); if (!log) return;
@@ -494,6 +497,7 @@ const Player = (() => {
           _method = 'JSON + PROXY'; unspin(); setBar('JSON + PROXY', best.url);
           let title = best.url; try { title = new URL(best.url).hostname; } catch { }
           await API.saveHistory(rawUrl.slice(0, 100), 'JSON: ' + title, 'JSON + PROXY');
+          pub.updateIframeMode(false);
           return _method;
         } catch (e) { pub.diag('fail', 'Lecture JSON', e.message); }
       }
@@ -506,14 +510,17 @@ const Player = (() => {
           const id = ytId(rawUrl); if (!id) throw new Error('ID YouTube invalide');
           pub.diag('info', 'YouTube embed', `ID: ${id}`);
           method = loadEmbed(`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`, 'YOUTUBE');
+          pub.updateIframeMode(true);
         } else if (type === 'vimeo') {
           const id = vimeoId(rawUrl); if (!id) throw new Error('ID Vimeo invalide');
           method = loadEmbed(`https://player.vimeo.com/video/${id}?autoplay=1`, 'VIMEO');
+          pub.updateIframeMode(true);
         } else if (type === 'hls') {
           spin('HLS…'); resetVideo();
           try { method = await loadHls(`/api/proxy?url=${encodeURIComponent(rawUrl)}`); }
           catch { method = await loadHls(rawUrl); }
           pub.diag('ok', `HLS via ${method}`);
+          pub.updateIframeMode(false);
         } else {
           let success = false;
           for (const fn of [tryResolve, tryProxy, tryBlobProxy, tryNative]) {
@@ -521,56 +528,208 @@ const Player = (() => {
             catch (err) { pub.diag('fail', 'Échec', err.message.slice(0, 150)); }
           }
           if (!success) throw new Error('Toutes les méthodes ont échoué.');
+          pub.updateIframeMode(false);
         }
         _method = method; unspin(); setBar(method, rawUrl);
         let title = rawUrl; try { title = new URL(rawUrl).hostname; } catch { }
         await API.saveHistory(rawUrl, title, method);
-        // Load formats panel in background
-        if (rawUrl.startsWith('http') && type !== 'hls') {
-          loadVfp(rawUrl).catch(() => { });
-        }
+
+        const nTitle = document.getElementById('n-video-title');
+        if (nTitle) nTitle.textContent = title;
+        if (!_cinemaActive) pub.toggleCinema();
+        if (rawUrl.startsWith('http') && type !== 'hls') { loadVfp(rawUrl).catch(() => { }); }
         return method;
       } catch (err) {
         pub.diag('fail', 'Erreur finale', err.message);
         showErr(err.message); throw err;
       }
     },
-  };
 
+    // ── Netflix Controls ──────────────────────────────
+    updateIframeMode(isIframe) {
+        const ctrl = document.getElementById('netflix-controls');
+        if (!ctrl) return;
+        const middle = ctrl.querySelector('.n-middle');
+        const progress = ctrl.querySelector('.n-progress-container');
+        const bottomLeft = ctrl.querySelector('.n-left');
 
-
-  // ── Casting ──────────────────────────────────────────
-  window.__onGCastApiAvailable = function(isAvailable) {
-    if (isAvailable) {
-      cast.framework.CastContext.getInstance().setOptions({
-        receiverApplicationId: chrome.cast.media.DEFAULT_RECEIVER_APP_ID,
-        autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
-      });
-
-      const context = cast.framework.CastContext.getInstance();
-      context.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, (event) => {
-        if (event.sessionState === cast.framework.SessionState.SESSION_STARTED) {
-          const session = context.getCurrentSession();
-          if (session && _url) {
-            const mediaInfo = new chrome.cast.media.MediaInfo(
-              window.location.origin + `/api/proxy?url=${encodeURIComponent(_url)}`,
-              'video/mp4'
-            );
-            const request = new chrome.cast.media.LoadRequest(mediaInfo);
-            session.loadMedia(request);
-          }
+        if (isIframe) {
+            if (middle) middle.style.visibility = 'hidden';
+            if (progress) progress.style.visibility = 'hidden';
+            if (bottomLeft) bottomLeft.style.visibility = 'hidden';
+        } else {
+            if (middle) middle.style.visibility = 'visible';
+            if (progress) progress.style.visibility = 'visible';
+            if (bottomLeft) bottomLeft.style.visibility = 'visible';
         }
-      });
+    },
+    showControls() {
+        const c = document.getElementById('netflix-controls');
+        if (!c) return;
+        c.classList.add('visible');
+        document.body.style.cursor = 'default';
+        if (_controlsTimeout) clearTimeout(_controlsTimeout);
+        _controlsTimeout = setTimeout(() => {
+          if (!vid().paused && ifr().style.display === 'none') {
+            c.classList.remove('visible');
+            document.body.style.cursor = 'none';
+          }
+        }, 5000);
+    },
+    nTogglePlay() {
+        const v = vid();
+        if (ifr().style.display !== 'none') return;
+        if (v.paused) v.play().catch(() => {});
+        else v.pause();
+        pub.updatePlayIcons();
+    },
+    updatePlayIcons() {
+        const v = vid();
+        const bigBtn = document.getElementById('n-play-pause-big');
+        const smallBtn = document.getElementById('n-play-btn');
+        const icon = v.paused ? '<i class="fas fa-play"></i>' : '<i class="fas fa-pause"></i>';
+        if (bigBtn) bigBtn.innerHTML = icon;
+        if (smallBtn) smallBtn.innerHTML = icon;
+    },
+    nSeek(seconds) {
+        const v = vid();
+        if (ifr().style.display !== 'none') return;
+        v.currentTime += seconds;
+        pub.showControls();
+    },
+    nToggleMute() {
+        const v = vid();
+        v.muted = !v.muted;
+        pub.updateVolumeIcons();
+    },
+    updateVolumeIcons() {
+        const v = vid();
+        const btn = document.getElementById('n-volume-btn');
+        let icon = '<i class="fas fa-volume-up"></i>';
+        if (v.muted || v.volume === 0) icon = '<i class="fas fa-volume-mute"></i>';
+        else if (v.volume < 0.5) icon = '<i class="fas fa-volume-down"></i>';
+        if (btn) btn.innerHTML = icon;
+    },
+    nToggleFullscreen() {
+        const stage = document.getElementById('player-stage');
+        if (!document.fullscreenElement) {
+          stage.requestFullscreen().catch(err => {
+            console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+          });
+        } else {
+          document.exitFullscreen();
+        }
+    },
+    updateProgress() {
+        const v = vid();
+        const fill = document.getElementById('n-progress-fill');
+        const current = document.getElementById('n-current-time');
+        const duration = document.getElementById('n-duration');
+        const container = document.getElementById('n-progress-container');
+
+        const pct = (v.currentTime / v.duration * 100) || 0;
+        if (fill) fill.style.width = pct + '%';
+        if (current) current.textContent = fmtDur(v.currentTime);
+        if (duration && !isNaN(v.duration)) duration.textContent = fmtDur(v.duration);
+        if (container) container.setAttribute('aria-valuenow', Math.round(pct));
+    },
+    handleProgressClick(e) {
+        const container = document.getElementById('n-progress-container');
+        const rect = container.getBoundingClientRect();
+        const pos = (e.clientX - rect.left) / rect.width;
+        vid().currentTime = pos * vid().duration;
+    },
+    toggleSidebarSection(id) {
+        const sidebar = document.getElementById('player-sidebar');
+        const sections = ['playlist-block', 'sidebar-queue-block', 'diag-settings'];
+        const isCinema = _cinemaActive;
+
+        if (isCinema) {
+          const isVisible = sidebar.classList.contains('visible');
+          const targetSection = document.getElementById(id);
+          const isTargetVisible = targetSection && targetSection.style.display !== 'none';
+
+          if (isVisible && isTargetVisible) {
+            sidebar.classList.remove('visible');
+          } else {
+            sidebar.classList.add('visible');
+            sections.forEach(s => {
+              const el = document.getElementById(s);
+              if (el) el.style.display = (s === id) ? 'block' : 'none';
+            });
+          }
+        } else {
+          sidebar.classList.remove('visible');
+          sections.forEach(s => {
+            const el = document.getElementById(s);
+            if (el) el.style.display = (s === id) ? 'block' : 'none';
+          });
+        }
+
+        const sidebarIsVisible = isCinema ? sidebar.classList.contains('visible') : true;
+        document.querySelectorAll('.n-top-right .n-btn').forEach(btn => {
+          const controls = btn.getAttribute('aria-controls');
+          const isThisActive = (controls === id && sidebarIsVisible);
+          btn.setAttribute('aria-expanded', isThisActive);
+        });
     }
   };
 
-  // Video ended → auto next
   document.addEventListener('DOMContentLoaded', () => {
     const v = document.getElementById('main-video');
-    if (v) v.addEventListener('ended', () => { if (window._playlist && window._playlistIdx >= 0) playNextPlaylistItem(); });
-    // ESC key closes cinema
+    const controls = document.getElementById('netflix-controls');
+
+    if (v) {
+        v.addEventListener('ended', () => { if (window._playlist && window._playlistIdx >= 0) playNextPlaylistItem(); });
+        v.addEventListener('play', pub.updatePlayIcons);
+        v.addEventListener('pause', pub.updatePlayIcons);
+        v.addEventListener('timeupdate', pub.updateProgress);
+        v.addEventListener('volumechange', pub.updateVolumeIcons);
+    }
+
+    if (controls) {
+        controls.addEventListener('mousemove', pub.showControls);
+        controls.addEventListener('click', (e) => {
+            if (e.target === controls || e.target.classList.contains('n-middle')) {
+                pub.nTogglePlay();
+            }
+        });
+    }
+
+    const prog = document.getElementById('n-progress-container');
+    if (prog) prog.addEventListener('click', pub.handleProgressClick);
+
+    const vol = document.getElementById('n-volume-slider');
+    if (vol) {
+      vol.addEventListener('input', (e) => {
+        v.volume = e.target.value;
+        v.muted = false;
+      });
+    }
+
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape' && _cinemaActive) pub.toggleCinema();
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+
+      switch(e.code) {
+        case 'Space':
+          e.preventDefault();
+          pub.nTogglePlay();
+          pub.showControls();
+          break;
+        case 'ArrowLeft':
+          pub.nSeek(-10);
+          break;
+        case 'ArrowRight':
+          pub.nSeek(10);
+          break;
+        case 'KeyF':
+          pub.nToggleFullscreen();
+          break;
+        case 'KeyM':
+          pub.nToggleMute();
+          break;
+      }
     });
   });
 
@@ -586,34 +745,18 @@ function setVfpTab(n, b) { Player.setVfpTab(n, b); }
 function closeVfp() { Player.closeVfp(); }
 function transcodeCurrent() { Player.transcodeCurrent(); }
 
-async function loadExternalSub() {
-  const url = document.getElementById('external-sub-url')?.value.trim();
-  if (!url) return;
-  try {
-    const encoded = encodeURIComponent(url);
-    const convertUrl = `/api/subtitles/convert?url=${encoded}`;
-    await Player.loadSub(encodeURIComponent(convertUrl), -1);
-    document.getElementById('external-sub-url').value = '';
-  } catch (e) {
-    toast('Erreur sous-titres', '✗');
-  }
-}
-
-function uploadExternalSub(input) {
-  const file = input.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    let content = e.target.result;
-    if (file.name.toLowerCase().endsWith('.srt')) {
-      content = 'WEBVTT\n\n' + content.replace(/,/g, '.');
+function nTogglePlay() { Player.nTogglePlay(); }
+function nSeek(s) { Player.nSeek(s); }
+function nToggleMute() { Player.nToggleMute(); }
+function nToggleFullscreen() { Player.nToggleFullscreen(); }
+function openVfp() { Player.openVfp(); }
+function toggleSidebarSection(id) { Player.toggleSidebarSection(id); }
+function goBack() {
+    if (document.referrer && document.referrer.includes(window.location.host)) {
+      window.history.back();
+    } else {
+      showPage('home');
     }
-    const blob = new Blob([content], { type: 'text/vtt' });
-    const url = URL.createObjectURL(blob);
-    Player.loadSub(encodeURIComponent(url), -1);
-    input.value = '';
-  };
-  reader.readAsText(file);
 }
 
 // ── Playlist support ─────────────────────────────────
@@ -625,28 +768,20 @@ async function loadPlaylist(url) {
   const block = document.getElementById('playlist-block');
   const list = document.getElementById('playlist-list');
   if (!block) return;
-
   block.style.display = 'block';
   list.innerHTML = '<div style="padding:14px;text-align:center;font-size:11px;color:var(--muted)">Chargement playlist…</div>';
-
   try {
     const res = await fetch(`/api/playlist?url=${encodeURIComponent(url)}`);
     const data = await res.json();
     if (!data.ok || !data.items?.length) { block.style.display = 'none'; return; }
-
     window._playlist = data;
     const cnt = document.getElementById('playlist-count');
     const titleEl = document.getElementById('playlist-sidebar-title');
     if (cnt) cnt.textContent = data.count;
     if (titleEl) titleEl.textContent = data.title || 'Playlist';
-
-    // Show dl row
     const dlRow = document.getElementById('playlist-dl-row');
     if (dlRow) dlRow.style.display = 'flex';
-
-    // Init selection
     window._plSelected = new Set(data.items.map((_, i) => i));
-
     list.innerHTML = data.items.map((item, i) => `
       <div class="pl-item" id="pl-${i}" onclick="playPlaylistItem(${i})">
         <input type="checkbox" class="pl-check" data-idx="${i}" checked
@@ -663,10 +798,7 @@ async function loadPlaylist(url) {
           <svg width="10" height="10" viewBox="0 0 24 24" fill="white"><path d="M8 5v14l11-7z"/></svg>
         </div>
       </div>`).join('');
-
-    // Auto-play first item if we navigated here with a playlist URL
     if (window._playlistIdx < 0) playPlaylistItem(0);
-
   } catch (e) { document.getElementById('playlist-block').style.display = 'none'; }
 }
 
@@ -688,15 +820,11 @@ async function playPlaylistItem(idx) {
   if (!window._playlist?.items?.[idx]) return;
   window._playlistIdx = idx;
   document.querySelectorAll('.pl-item').forEach((el, i) => el.classList.toggle('active', i === idx));
-  // Scroll into view
   const el = document.getElementById(`pl-${idx}`);
   el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-
   const item = window._playlist.items[idx];
   Player.diag('info', `Playlist [${idx + 1}/${window._playlist.count}]`, item.title);
   await Player.load(item.url);
-
-  // Show next bar if there's a next item
   updateNextBar(idx);
 }
 
@@ -735,7 +863,6 @@ function fmtDur(s) {
 }
 function escHtml(s) { return String(s).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 
-// ── Sidebar queue rendering ───────────────────────────
 async function renderSidebarQueue() {
   try {
     const res = await fetch('/api/queue');
@@ -763,5 +890,4 @@ async function removeFromSidebarQueue(id) {
 
 function getDomain(url) { try { return new URL(url).hostname.replace('www.', ''); } catch { return url.slice(0, 30); } }
 
-// Refresh sidebar queue periodically when on player page
 setInterval(() => { if (document.getElementById('page-player')?.classList.contains('active')) renderSidebarQueue(); }, 3000);
