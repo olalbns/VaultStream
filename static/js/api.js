@@ -6,13 +6,28 @@
 const API = {
   BASE: window.location.origin,
 
+  getDeviceToken() {
+    let token = localStorage.getItem('sv_device_token');
+    if (!token) {
+      token = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+      localStorage.setItem('sv_device_token', token);
+    }
+    return token;
+  },
+
+  async fetch(url, options = {}) {
+    options.headers = options.headers || {};
+    options.headers['X-Device-Token'] = this.getDeviceToken();
+    return fetch(url, options);
+  },
+
   /**
    * Probe une URL — vérifie accessibilité + métadonnées
    * @returns {Promise<{ok, status, content_type, content_length, seekable, error}>}
    */
   async probe(url) {
     try {
-      const res = await fetch(`${API.BASE}/api/probe?url=${encodeURIComponent(url)}`);
+      const res = await this.fetch(`${API.BASE}/api/probe?url=${encodeURIComponent(url)}`);
       return await res.json();
     } catch (e) {
       return { ok: false, status: 0, error: e.message };
@@ -33,7 +48,7 @@ const API = {
    */
   async getHistory() {
     try {
-      const res = await fetch(`${API.BASE}/api/history`);
+      const res = await this.fetch(`${API.BASE}/api/history`);
       return await res.json();
     } catch {
       return [];
@@ -45,7 +60,7 @@ const API = {
    */
   async saveHistory(url, title, method) {
     try {
-      await fetch(`${API.BASE}/api/history`, {
+      await this.fetch(`${API.BASE}/api/history`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url, title, method }),
@@ -60,7 +75,7 @@ const API = {
    */
   async deleteHistory(id) {
     try {
-      await fetch(`${API.BASE}/api/history/delete`, {
+      await this.fetch(`${API.BASE}/api/history/delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
@@ -73,7 +88,16 @@ const API = {
    */
   async search(query) {
     try {
-      const res = await fetch(`${API.BASE}/api/search?q=${encodeURIComponent(query)}`);
+      const res = await this.fetch(`${API.BASE}/api/search?q=${encodeURIComponent(query)}`);
+      return await res.json();
+    } catch (e) {
+      return { ok: false, error: e.message };
+    }
+  },
+
+  async getMetadata(query) {
+    try {
+      const res = await this.fetch(`${API.BASE}/api/metadata?q=${encodeURIComponent(query)}`);
       return await res.json();
     } catch (e) {
       return { ok: false, error: e.message };
@@ -85,7 +109,7 @@ const API = {
    */
   async retryDownload(id) {
     try {
-      const res = await fetch(`${API.BASE}/api/ytdl/retry`, {
+      const res = await this.fetch(`${API.BASE}/api/ytdl/retry`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id }),
@@ -98,7 +122,7 @@ const API = {
 
   async getYtdlAuthStatus() {
     try {
-      const res = await fetch(`${API.BASE}/api/ytdl/auth/status`);
+      const res = await this.fetch(`${API.BASE}/api/ytdl/auth/status`);
       return await res.json();
     } catch (e) {
       return { ok: false, error: e.message };
@@ -107,7 +131,7 @@ const API = {
 
   async saveYtdlCookies(text) {
     try {
-      const res = await fetch(`${API.BASE}/api/ytdl/cookies/save`, {
+      const res = await this.fetch(`${API.BASE}/api/ytdl/cookies/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
@@ -120,7 +144,7 @@ const API = {
 
   async clearYtdlCookies() {
     try {
-      const res = await fetch(`${API.BASE}/api/ytdl/cookies/clear`, {
+      const res = await this.fetch(`${API.BASE}/api/ytdl/cookies/clear`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });

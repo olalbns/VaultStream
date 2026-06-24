@@ -12,7 +12,7 @@ let _pendingItems = null; // items to add after creating collection
 // ── Load ──────────────────────────────────────────────
 async function loadCollections() {
   try {
-    const res = await fetch('/api/collections');
+    const res = await API.fetch('/api/collections');
     _collections = await res.json();
     renderCollectionGrid();
   } catch {}
@@ -53,7 +53,7 @@ function renderCollectionGrid() {
 // ── Detail view ───────────────────────────────────────
 async function openCollection(id) {
   try {
-    const res = await fetch(`/api/collections?id=${id}`);
+    const res = await API.fetch(`/api/collections?id=${id}`);
     _currentCol   = await res.json();
     _currentColId = id;
 
@@ -147,7 +147,7 @@ async function playCollectionAll() {
   if (!_currentCol?.items?.length) return;
   // Add all to queue then play first
   for (const item of _currentCol.items) {
-    await fetch('/api/queue', {
+    await API.fetch('/api/queue', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ action:'add', item: { url:item.url, title:item.title||item.url } })
     });
@@ -157,7 +157,7 @@ async function playCollectionAll() {
 }
 
 async function playCollectionById(id) {
-  const res = await fetch(`/api/collections?id=${id}`);
+  const res = await API.fetch(`/api/collections?id=${id}`);
   const col = await res.json();
   if (!col?.items?.[0]) return;
   showPage('player');
@@ -169,7 +169,7 @@ async function playCollectionById(id) {
 async function addCollectionToQueue() {
   if (!_currentCol?.items?.length) return;
   for (const item of _currentCol.items) {
-    await fetch('/api/queue', {
+    await API.fetch('/api/queue', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ action:'add', item:{ url:item.url, title:item.title||item.url } })
     });
@@ -179,11 +179,11 @@ async function addCollectionToQueue() {
 }
 
 async function addColToQueueById(id) {
-  const res = await fetch(`/api/collections?id=${id}`);
+  const res = await API.fetch(`/api/collections?id=${id}`);
   const col = await res.json();
   if (!col?.items?.length) return;
   for (const item of col.items) {
-    await fetch('/api/queue', {
+    await API.fetch('/api/queue', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ action:'add', item:{ url:item.url, title:item.title||item.url } })
     });
@@ -195,7 +195,7 @@ async function addColToQueueById(id) {
 async function dlCollectionAll() {
   if (!_currentCol?.items?.length) return;
   const urls = _currentCol.items.map(i => i.url);
-  await fetch('/api/ytdl/download/batch', {
+  await API.fetch('/api/ytdl/download/batch', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ urls, format_id:'best', ext:'mp4' }),
   });
@@ -224,7 +224,7 @@ function editCollectionModal() {
 }
 
 async function editCollectionById(id) {
-  const res = await fetch(`/api/collections?id=${id}`);
+  const res = await API.fetch(`/api/collections?id=${id}`);
   const col = await res.json();
   _editingColId = id;
   document.getElementById('modal-col-title').textContent = 'Modifier la collection';
@@ -252,7 +252,7 @@ async function submitCollectionForm() {
       document.getElementById('col-detail-name').textContent = name;
     }
   } else {
-    const res  = await fetch('/api/collections', {
+    const res  = await API.fetch('/api/collections', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ action:'create', name, description:desc, icon, color }),
     });
@@ -261,7 +261,7 @@ async function submitCollectionForm() {
 
     // If we have pending items to add
     if (_pendingItems?.length && data.id) {
-      await fetch('/api/collections', {
+      await API.fetch('/api/collections', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ action:'add_items', col_id:data.id, items:_pendingItems }),
       });
@@ -311,7 +311,7 @@ function openAddToColModal(items) {
 
 async function addItemsToExistingCol(colId) {
   if (!_pendingItems?.length) return;
-  const res = await fetch('/api/collections', {
+  const res = await API.fetch('/api/collections', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ action:'add_items', col_id:colId, items:_pendingItems }),
   });
@@ -324,7 +324,7 @@ async function addItemsToExistingCol(colId) {
 
 // From queue page
 async function saveQueueAsCollection() {
-  const res = await fetch('/api/queue');
+  const res = await API.fetch('/api/queue');
   const queue = await res.json();
   if (!queue.length) { toast('Queue vide', '⚠'); return; }
   const items = queue.map(q => ({ url:q.url, title:q.title||q.url }));
@@ -349,7 +349,7 @@ function addPlaylistToColl() {
 
 // ── API helper ────────────────────────────────────────
 async function colAction(action, data = {}) {
-  const res = await fetch('/api/collections', {
+  const res = await API.fetch('/api/collections', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ action, ...data }),
   });

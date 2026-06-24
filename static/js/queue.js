@@ -7,7 +7,7 @@ let _queueIdx = -1;
 
 async function loadQueue() {
   try {
-    const res = await fetch('/api/queue');
+    const res = await API.fetch('/api/queue');
     _queue = await res.json();
     renderQueue();
     updateQueueIndicator();
@@ -73,7 +73,7 @@ async function playQueueItem(id) {
 
 async function queueAction(action, extra = {}) {
   try {
-    const res = await fetch('/api/queue', {
+    const res = await API.fetch('/api/queue', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, ...extra }),

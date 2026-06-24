@@ -66,11 +66,47 @@
     childList: true, subtree: true,
   });
 
+  // ── Injection de boutons ─────────────────────────────
+  function injectButtons() {
+    const host = window.location.hostname;
+
+    if (host.includes('youtube.com')) {
+      const v = document.querySelector('.ytd-video-primary-info-renderer');
+      if (v && !document.getElementById('sv-yt-btn')) {
+        const btn = document.createElement('button');
+        btn.id = 'sv-yt-btn';
+        btn.innerText = '▶ StreamVault';
+        btn.style.cssText = 'background:#f00;color:#fff;border:none;padding:10px 20px;border-radius:2px;font-weight:bold;cursor:pointer;margin:10px;';
+        btn.onclick = () => reportUrl(window.location.href);
+        v.appendChild(btn);
+      }
+    }
+
+    // Generic detector for video players
+    document.querySelectorAll('video').forEach(v => {
+      const container = v.parentElement;
+      if (container && !container.querySelector('.sv-inject-btn')) {
+        const btn = document.createElement('button');
+        btn.className = 'sv-inject-btn';
+        btn.innerText = '🎬 StreamVault';
+        btn.style.cssText = 'position:absolute;top:10px;right:10px;z-index:9999;background:rgba(0,0,0,0.7);color:#0ff;border:1px solid #0ff;padding:5px 10px;border-radius:4px;font-size:12px;cursor:pointer;';
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          e.preventDefault();
+          reportUrl(window.location.href);
+        };
+        container.style.position = 'relative';
+        container.appendChild(btn);
+      }
+    });
+  }
+
   // Scan initial
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', scanVideos);
+    document.addEventListener('DOMContentLoaded', () => { scanVideos(); injectButtons(); });
   } else {
     scanVideos();
+    injectButtons();
   }
 
   // Re-scan après un délai (pour les vidéos chargées en JS)

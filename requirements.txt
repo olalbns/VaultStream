@@ -1,1 +1,6 @@
 yt-dlp
+fastapi
+uvicorn
+python-multipart
+httpx
+anyio
