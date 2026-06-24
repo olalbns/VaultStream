@@ -20,14 +20,14 @@ async function addToQueueManual() {
   if (!url) return;
   await queueAction('add', { item: { url, title: url } });
   if (inp) inp.value = '';
-  toast('Ajouté à la queue', '≡');
+  toast('Ajouté à la queue', '<i class="fas fa-list-ul"></i>');
 }
 
 async function addCurrentToQueue() {
   const url = Player.currentUrl;
-  if (!url) { toast('Aucune vidéo en cours', '⚠'); return; }
+  if (!url) { toast('Aucune vidéo en cours', '<i class="fas fa-exclamation-triangle"></i>'); return; }
   await queueAction('add', { item: { url, title: url } });
-  toast('Ajouté à la queue', '≡');
+  toast('Ajouté à la queue', '<i class="fas fa-list-ul"></i>');
 }
 
 // Called from player page "add to queue" button
@@ -35,13 +35,14 @@ function addToQueue() { addCurrentToQueue(); }
 
 async function playNextQueue() {
   const pending = _queue.filter(q => !q.played);
-  if (!pending.length) { toast('Queue vide', '⚠'); return; }
+  if (!pending.length) { toast('Queue vide', '<i class="fas fa-exclamation-triangle"></i>'); return; }
   const next = pending[0];
   await queueAction('played', { id: next.id });
   showPage('player');
-  const navP = document.getElementById('nav-player'); if (navP) navP.style.display = '';
+  const navLink = document.getElementById('nav-player-link');
+  if (navLink) navLink.style.display = 'block';
   await Player.load(next.url);
-  toast(`▶ ${getDomain(next.url)}`, '≡');
+  toast(`${getDomain(next.url)}`, '<i class="fas fa-play"></i>');
 }
 
 async function shuffleQueue() {
@@ -55,7 +56,7 @@ async function shuffleQueue() {
 async function clearQueue() {
   if (!confirm('Vider la queue ?')) return;
   await queueAction('clear');
-  toast('Queue vidée', '✓');
+  toast('Queue vidée', '<i class="fas fa-check"></i>');
 }
 
 async function removeFromQueue(id) {
@@ -67,7 +68,8 @@ async function playQueueItem(id) {
   if (!item) return;
   await queueAction('played', { id });
   showPage('player');
-  const navP = document.getElementById('nav-player'); if (navP) navP.style.display = '';
+  const navLink = document.getElementById('nav-player-link');
+  if (navLink) navLink.style.display = 'block';
   await Player.load(item.url);
 }
 
@@ -104,14 +106,14 @@ function renderQueue() {
   list.innerHTML = _queue.map((q, i) => `
     <div class="queue-item ${q.played ? 'played' : ''}" id="qi-${q.id}">
       <div class="qi-num">${i + 1}</div>
-      <div class="qi-icon">${q.played ? '✓' : '🎞'}</div>
+      <div class="qi-icon">${q.played ? '<i class="fas fa-check"></i>' : '<i class="fas fa-film"></i>'}</div>
       <div class="qi-info">
         <div class="qi-title">${esc(getDomain(q.url))}</div>
         <div class="qi-url">${esc(q.url)}</div>
       </div>
       <div class="qi-actions">
         <button class="btn-primary" style="font-size:11px;padding:6px 12px"
-          onclick="playQueueItem('${q.id}')">▶</button>
+          onclick="playQueueItem('${q.id}')"><i class="fas fa-play"></i></button>
         <button class="btn-ghost" style="font-size:11px;padding:6px 10px"
           onclick="removeFromQueue('${q.id}')">✕</button>
       </div>

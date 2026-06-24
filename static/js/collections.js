@@ -34,7 +34,7 @@ function renderCollectionGrid() {
   grid.innerHTML = _collections.map(col => `
     <div class="col-card" onclick="openCollection('${col.id}')">
       <div class="col-card-top" style="background:${col.color}22;border-bottom:2px solid ${col.color}44">
-        <span style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">${col.icon||'🎬'}</span>
+        <span style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">${col.icon||'<i class="fas fa-film"></i>'}</span>
         <span class="col-card-count">${col.count} vidéo${col.count!==1?'s':''}</span>
       </div>
       <div class="col-card-body">
@@ -42,10 +42,10 @@ function renderCollectionGrid() {
         <div class="col-card-desc">${esc(col.description||'')}</div>
       </div>
       <div class="col-card-actions" onclick="event.stopPropagation()">
-        <button class="btn-tiny" onclick="playCollectionById('${col.id}')">▶ Lire</button>
+        <button class="btn-tiny" onclick="playCollectionById('${col.id}')"><i class="fas fa-play"></i> Lire</button>
         <button class="btn-tiny" onclick="addColToQueueById('${col.id}')">+ Queue</button>
         <button class="btn-tiny" onclick="editCollectionById('${col.id}')">✏</button>
-        <button class="btn-tiny" style="color:var(--muted)" onclick="deleteCollectionById('${col.id}')">🗑</button>
+        <button class="btn-tiny" style="color:var(--muted)" onclick="deleteCollectionById('${col.id}')"><i class="fas fa-trash"></i></button>
       </div>
     </div>`).join('');
 }
@@ -59,13 +59,13 @@ async function openCollection(id) {
 
     document.getElementById('col-list-view').style.display   = 'none';
     document.getElementById('col-detail-view').style.display = '';
-    document.getElementById('col-detail-icon').textContent   = _currentCol.icon || '🎬';
+    document.getElementById('col-detail-icon').textContent   = _currentCol.icon || '<i class="fas fa-film"></i>';
     document.getElementById('col-detail-name').textContent   = _currentCol.name;
     document.getElementById('col-detail-meta').textContent   =
       `${_currentCol.items?.length||0} vidéo${(_currentCol.items?.length||0)!==1?'s':''} · Créée le ${fmtDate(_currentCol.created)}`;
 
     renderColDetail(_currentCol);
-  } catch(e) { toast('Erreur chargement collection','✗'); }
+  } catch(e) { toast('Erreur chargement collection','<i class="fas fa-times"></i>'); }
 }
 
 function closeCollectionDetail() {
@@ -80,7 +80,7 @@ function renderColDetail(col) {
   if (!grid) return;
   if (!col.items?.length) {
     grid.innerHTML = `<div class="lib-empty">
-      <div class="lib-empty-icon">🎬</div>
+      <div class="lib-empty-icon"><i class="fas fa-film"></i></div>
       <p>Aucune vidéo dans cette collection</p>
     </div>`; return;
   }
@@ -89,7 +89,7 @@ function renderColDetail(col) {
     const ytId = getYtId(item.url);
     const thumb = ytId
       ?`<img src="https://img.youtube.com/vi/${ytId}/mqdefault.jpg" loading="lazy" onerror="this.style.display='none'">`
-      : (item.thumbnail ?`<img src="${item.thumbnail}" loading="lazy" onerror="this.style.display='none'">` : `<span class="card-thumb-icon">🎞</span>`);
+      : (item.thumbnail ?`<img src="${item.thumbnail}" loading="lazy" onerror="this.style.display='none'">` : `<span class="card-thumb-icon"><i class="fas fa-film"></i></span>`);
     return `
       <div class="video-card" onclick="playFromCollection('${esc(item.url)}')">
         <div class="card-thumb" style="position:relative">
@@ -127,7 +127,7 @@ async function addToCurrentCollection() {
     item: { url, title },
   });
   if (inp) inp.value = '';
-  toast('Ajouté à la collection', '✓');
+  toast('Ajouté à la collection', '<i class="fas fa-check"></i>');
 }
 
 async function removeFromCol(colId, itemId) {
@@ -139,7 +139,7 @@ async function removeFromCol(colId, itemId) {
 // ── Collection actions ────────────────────────────────
 async function playFromCollection(url) {
   showPage('player');
-  document.getElementById('nav-player-li').style.display = 'block';
+  document.getElementById('nav-player-link').style.display = 'block';
   await Player.load(url);
 }
 
@@ -161,9 +161,9 @@ async function playCollectionById(id) {
   const col = await res.json();
   if (!col?.items?.[0]) return;
   showPage('player');
-  document.getElementById('nav-player-li').style.display = 'block';
+  document.getElementById('nav-player-link').style.display = 'block';
   await Player.load(col.items[0].url);
-  toast(`▶ ${col.name}`, '🎬');
+  toast(`<i class="fas fa-play"></i> ${col.name}`, '<i class="fas fa-film"></i>');
 }
 
 async function addCollectionToQueue() {
@@ -175,7 +175,7 @@ async function addCollectionToQueue() {
     });
   }
   await loadQueue();
-  toast(`${_currentCol.items.length} vidéo(s) ajoutée(s) à la queue`, '≡');
+  toast(`${_currentCol.items.length} vidéo(s) ajoutée(s) à la queue`, '<i class="fas fa-list-ul"></i>');
 }
 
 async function addColToQueueById(id) {
@@ -189,7 +189,7 @@ async function addColToQueueById(id) {
     });
   }
   await loadQueue();
-  toast(`${col.items.length} vidéo(s) → Queue`, '≡');
+  toast(`${col.items.length} vidéo(s) → Queue`, '<i class="fas fa-list-ul"></i>');
 }
 
 async function dlCollectionAll() {
@@ -199,7 +199,7 @@ async function dlCollectionAll() {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ urls, format_id:'best', ext:'mp4' }),
   });
-  toast(`${urls.length} téléchargements lancés`, '↓');
+  toast(`${urls.length} téléchargements lancés`, '<i class="fas fa-download"></i>');
   showPage('downloader');
   setTimeout(refreshDlList, 500);
 }
@@ -211,7 +211,7 @@ function openCreateCollection(pendingItems) {
   document.getElementById('modal-col-title').textContent = 'Nouvelle collection';
   document.getElementById('col-form-name').value  = '';
   document.getElementById('col-form-desc').value  = '';
-  document.getElementById('col-form-icon').value  = '🎬';
+  document.getElementById('col-form-icon').value  = '<i class="fas fa-film"></i>';
   document.getElementById('col-form-color').value = '#e5091a';
   document.querySelectorAll('.cp-btn').forEach(b => b.classList.remove('active'));
   document.querySelector('.cp-btn[data-color="#e5091a"]')?.classList.add('active');
@@ -230,7 +230,7 @@ async function editCollectionById(id) {
   document.getElementById('modal-col-title').textContent = 'Modifier la collection';
   document.getElementById('col-form-name').value  = col.name || '';
   document.getElementById('col-form-desc').value  = col.description || '';
-  document.getElementById('col-form-icon').value  = col.icon || '🎬';
+  document.getElementById('col-form-icon').value  = col.icon || '<i class="fas fa-film"></i>';
   document.getElementById('col-form-color').value = col.color || '#e5091a';
   document.querySelectorAll('.cp-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.color === col.color));
@@ -240,15 +240,15 @@ async function editCollectionById(id) {
 async function submitCollectionForm() {
   const name  = document.getElementById('col-form-name').value.trim();
   const desc  = document.getElementById('col-form-desc').value.trim();
-  const icon  = document.getElementById('col-form-icon').value.trim() || '🎬';
+  const icon  = document.getElementById('col-form-icon').value.trim() || '<i class="fas fa-film"></i>';
   const color = document.getElementById('col-form-color').value || '#e5091a';
-  if (!name) { toast('Donne un nom à la collection', '⚠'); return; }
+  if (!name) { toast('Donne un nom à la collection', '<i class="fas fa-exclamation-triangle"></i>'); return; }
 
   if (_editingColId) {
     await colAction('update', { id:_editingColId, name, description:desc, icon, color });
-    toast('Collection modifiée', '✓');
+    toast('Collection modifiée', '<i class="fas fa-check"></i>');
     if (_currentColId === _editingColId) {
-      document.getElementById('col-detail-icon').textContent = icon;
+      document.getElementById('col-detail-icon').innerHTML = icon;
       document.getElementById('col-detail-name').textContent = name;
     }
   } else {
@@ -257,7 +257,7 @@ async function submitCollectionForm() {
       body: JSON.stringify({ action:'create', name, description:desc, icon, color }),
     });
     const data = await res.json();
-    toast('Collection créée', '✓');
+    toast('Collection créée', '<i class="fas fa-check"></i>');
 
     // If we have pending items to add
     if (_pendingItems?.length && data.id) {
@@ -265,7 +265,7 @@ async function submitCollectionForm() {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ action:'add_items', col_id:data.id, items:_pendingItems }),
       });
-      toast(`${_pendingItems.length} vidéo(s) ajoutée(s)`, '✓');
+      toast(`${_pendingItems.length} vidéo(s) ajoutée(s)`, '<i class="fas fa-check"></i>');
     }
   }
 
@@ -285,7 +285,7 @@ async function deleteCollectionById(id) {
   if (!confirm(`Supprimer "${col?.name||id}" ?`)) return;
   await colAction('delete', { id });
   await loadCollections();
-  toast('Collection supprimée', '🗑');
+  toast('Collection supprimée', '<i class="fas fa-trash"></i>');
 }
 
 // ── Add to collection modal ───────────────────────────
@@ -299,7 +299,7 @@ function openAddToColModal(items) {
   } else {
     list.innerHTML = _collections.map(col => `
       <div class="add-to-col-item" onclick="addItemsToExistingCol('${col.id}')">
-        <div class="add-to-col-icon">${col.icon||'🎬'}</div>
+        <div class="add-to-col-icon">${col.icon||'<i class="fas fa-film"></i>'}</div>
         <div class="add-to-col-info">
           <div class="add-to-col-name">${esc(col.name)}</div>
           <div class="add-to-col-count">${col.count} vidéo${col.count!==1?'s':''}</div>
@@ -317,7 +317,7 @@ async function addItemsToExistingCol(colId) {
   });
   const data = await res.json();
   closeModal('modal-add-to-col');
-  toast(`${data.added||0} vidéo(s) ajoutée(s)`, '✓');
+  toast(`${data.added||0} vidéo(s) ajoutée(s)`, '<i class="fas fa-check"></i>');
   _pendingItems = null;
   await loadCollections();
 }
@@ -326,7 +326,7 @@ async function addItemsToExistingCol(colId) {
 async function saveQueueAsCollection() {
   const res = await API.fetch('/api/queue');
   const queue = await res.json();
-  if (!queue.length) { toast('Queue vide', '⚠'); return; }
+  if (!queue.length) { toast('Queue vide', '<i class="fas fa-exclamation-triangle"></i>'); return; }
   const items = queue.map(q => ({ url:q.url, title:q.title||q.url }));
   openCreateCollection(items);
   showPage('collections');
@@ -343,7 +343,7 @@ function addPlaylistToCollection() {
 // From downloader playlist section
 function addPlaylistToColl() {
   const items = getSelectedPlaylistItems();
-  if (!items.length) { toast('Aucun élément sélectionné', '⚠'); return; }
+  if (!items.length) { toast('Aucun élément sélectionné', '<i class="fas fa-exclamation-triangle"></i>'); return; }
   loadCollections().then(() => openAddToColModal(items));
 }
 
@@ -366,18 +366,6 @@ function setColColor(color, btn) {
   btn.classList.add('active');
 }
 
-// Init icon picker clicks
-document.addEventListener('DOMContentLoaded', () => {
-  const picker = document.getElementById('icon-picker');
-  if (picker) {
-    // Convert text to clickable spans
-    const icons = picker.textContent.trim().split(/\s+/);
-    picker.innerHTML = icons.map(i =>
-      `<span onclick="document.getElementById('col-form-icon').value='${i}';this.parentElement.querySelectorAll('span').forEach(s=>s.style.background='');this.style.background='var(--s3)'">${i}</span>`
-    ).join('');
-  }
-  loadCollections();
-});
 
 // ── Shared utils ──────────────────────────────────────
 function getYtId(url) {
@@ -404,4 +392,10 @@ function fmtDate(ts) {
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function setColIcon(icon, btn) {
+  document.getElementById('col-form-icon').value = icon;
+  btn.parentElement.querySelectorAll('span').forEach(s => s.style.background = '');
+  btn.style.background = 'var(--s3)';
 }

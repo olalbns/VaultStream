@@ -20,7 +20,7 @@
   <aside id="sidebar" role="navigation" aria-label="Menu principal">
     <div class="sidebar-header">
       <div class="logo" onclick="showPage('home')">
-        <div class="logo-mark">▶</div>
+        <div class="logo-mark"><i class="fas fa-play"></i></div>
         <span class="logo-name">STREAMVAULT</span>
       </div>
     </div>
@@ -29,30 +29,30 @@
       <div class="nav-group">
         <span class="nav-label">NAVIGATION</span>
         <a href="#" class="nav-item active" data-page="home" onclick="showPage('home')" aria-label="Accueil">
-          <span class="nav-icon">🏠</span> <span class="nav-text">Accueil</span>
+          <span class="nav-icon"><i class="fas fa-home"></i></span> <span class="nav-text">Accueil</span>
         </a>
         <a href="#" class="nav-item" data-page="downloader" onclick="showPage('downloader')" aria-label="Téléchargements">
-          <span class="nav-icon">↓</span> <span class="nav-text">Télécharger</span>
+          <span class="nav-icon"><i class="fas fa-download"></i></span> <span class="nav-text">Télécharger</span>
         </a>
         <a href="#" class="nav-item" data-page="queue" onclick="showPage('queue')" aria-label="File d'attente">
-          <span class="nav-icon">≡</span> <span class="nav-text">Queue</span>
+          <span class="nav-icon"><i class="fas fa-list-ul"></i></span> <span class="nav-text">Queue</span>
         </a>
       </div>
 
       <div class="nav-group">
         <span class="nav-label">BIBLIOTHÈQUE</span>
         <a href="#" class="nav-item" data-page="collections" onclick="showPage('collections')" aria-label="Collections">
-          <span class="nav-icon">📁</span> <span class="nav-text">Collections</span>
+          <span class="nav-icon"><i class="fas fa-folder"></i></span> <span class="nav-text">Collections</span>
         </a>
         <a href="#" class="nav-item" data-page="library" onclick="showPage('library')" aria-label="Historique">
-          <span class="nav-icon">📚</span> <span class="nav-text">Historique</span>
+          <span class="nav-icon"><i class="fas fa-history"></i></span> <span class="nav-text">Historique</span>
         </a>
       </div>
 
       <div class="nav-group">
         <span class="nav-label">LECTEUR</span>
         <a href="#" class="nav-item" id="nav-player-link" data-page="player" onclick="showPage('player')" style="display:none">
-          <span class="nav-icon">🎬</span> <span class="nav-text">En lecture</span>
+          <span class="nav-icon"><i class="fas fa-film"></i></span> <span class="nav-text">En lecture</span>
         </a>
       </div>
     </nav>
@@ -69,107 +69,17 @@
     <header id="top-bar">
       <div class="search-container">
         <input type="text" id="nav-search-input" placeholder="Rechercher une vidéo ou un torrent (magnet)..." onkeydown="if(event.key==='Enter')globalSearch()">
-        <button class="search-btn" onclick="globalSearch()" aria-label="Rechercher">🔍</button>
+        <button class="search-btn" onclick="globalSearch()" aria-label="Rechercher"><i class="fas fa-search"></i></button>
       </div>
       <div class="top-actions">
         <div class="queue-indicator" id="queue-indicator" style="display:none" onclick="showPage('queue')">
-          <span>Queue</span> <span class="count-badge" id="queue-count">0</span>
+          <i class="fas fa-list-ul"></i> <span>Queue</span> <span class="count-badge" id="queue-count">0</span>
         </div>
-        <button class="btn-primary btn-sm" onclick="focusInput()">+ Nouveau lien</button>
+        <button class="btn-primary btn-sm" onclick="focusInput()"><i class="fas fa-plus"></i> Nouveau lien</button>
       </div>
     </header>
 
-      <!-- Video stage -->
-      <div class="player-stage" id="player-stage">
-        <div class="stage-idle" id="stage-idle">
-          <div class="stage-idle-icon">
-            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-              <circle cx="12" cy="12" r="10"/><path d="M10 8l6 4-6 4V8z"/>
-            </svg>
-          </div>
-          <p>Colle un lien pour démarrer</p>
-        </div>
-        <div class="stage-video" id="stage-video" style="display:none">
-          <video id="main-video" autoplay playsinline preload="metadata"></video>
-
-          <!-- Netflix-style Custom Controls -->
-          <div class="netflix-controls" id="netflix-controls" role="region" aria-label="Contrôles du lecteur">
-            <!-- Top bar -->
-            <div class="n-top">
-              <button class="n-btn n-back" onclick="goBack()" title="Retour" aria-label="Retour"><i class="fas fa-arrow-left"></i></button>
-              <div class="n-title" id="n-video-title" aria-live="polite">StreamVault</div>
-              <div class="n-top-right">
-                <button class="n-btn" onclick="toggleSidebarSection('playlist-block')" title="Playlist" aria-label="Afficher la playlist" aria-expanded="false" aria-controls="playlist-block"><i class="fas fa-list"></i></button>
-                <button class="n-btn" onclick="toggleSidebarSection('sidebar-queue-block')" title="Queue" aria-label="Afficher la queue" aria-expanded="false" aria-controls="sidebar-queue-block"><i class="fas fa-layer-group"></i></button>
-                <button class="n-btn" onclick="toggleSidebarSection('diag-settings')" title="Diagnostic & Paramètres" aria-label="Afficher les paramètres" aria-expanded="false" aria-controls="diag-settings"><i class="fas fa-cog"></i></button>
-              </div>
-            </div>
-
-            <!-- Middle controls (Play/Pause/Seek) -->
-            <div class="n-middle">
-              <button class="n-btn n-big" onclick="nSeek(-10)" title="Reculer 10s" aria-label="Reculer de 10 secondes"><i class="fas fa-backward"></i></button>
-              <button class="n-btn n-play-pause" id="n-play-pause-big" onclick="nTogglePlay()" aria-label="Lecture / Pause"><i class="fas fa-play"></i></button>
-              <button class="n-btn n-big" onclick="nSeek(10)" title="Avancer 10s" aria-label="Avancer de 10 secondes"><i class="fas fa-forward"></i></button>
-            </div>
-
-            <!-- Bottom controls -->
-            <div class="n-bottom">
-              <!-- Progress bar -->
-              <div class="n-progress-container" id="n-progress-container"
-                   role="slider" aria-label="Position de lecture"
-                   aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
-                   tabindex="0">
-                <div class="n-progress-bar">
-                  <div class="n-progress-fill" id="n-progress-fill"></div>
-                  <div class="n-progress-handle"></div>
-                </div>
-              </div>
-
-              <div class="n-bottom-controls">
-                <div class="n-left">
-                  <button class="n-btn" onclick="nTogglePlay()" id="n-play-btn" aria-label="Lecture / Pause"><i class="fas fa-play"></i></button>
-                  <button class="n-btn" onclick="nSeek(-10)" aria-label="Reculer 10s"><i class="fas fa-rotate-left"></i></button>
-                  <button class="n-btn" onclick="nSeek(10)" aria-label="Avancer 10s"><i class="fas fa-rotate-right"></i></button>
-
-                  <div class="n-volume-group">
-                    <button class="n-btn" id="n-volume-btn" onclick="nToggleMute()" aria-label="Couper le son"><i class="fas fa-volume-up"></i></button>
-                    <input type="range" class="n-volume-slider" id="n-volume-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume">
-                  </div>
-
-                  <div class="n-time" aria-live="off">
-                    <span id="n-current-time">0:00</span> / <span id="n-duration">0:00</span>
-                  </div>
-                </div>
-
-                <div class="n-right">
-                  <button class="n-btn" id="n-next-btn" onclick="playNextPlaylistItem()" title="Suivant" aria-label="Vidéo suivante"><i class="fas fa-step-forward"></i></button>
-                  <button class="n-btn" onclick="openVfp()" title="Audio & Sous-titres" aria-label="Options audio et sous-titres"><i class="fas fa-closed-captioning"></i></button>
-                  <button class="n-btn" onclick="nToggleFullscreen()" title="Plein écran" aria-label="Plein écran"><i class="fas fa-expand"></i></button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <iframe id="embed-iframe"
-            style="display:none;position:absolute;inset:0;width:100%;height:100%;border:none;"
-            allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
-          <div class="stage-spinner" id="stage-spinner">
-            <div class="spinner-ring"></div>
-            <div class="spinner-label" id="spinner-label">Connexion…</div>
-            <div class="spinner-sub" id="spinner-sub"></div>
-          </div>
-          <div class="stage-error" id="stage-error" style="display:none">
-            <div class="stage-error-icon">⚠</div>
-            <h3>Lecture impossible</h3>
-            <p id="stage-error-msg"></p>
-            <div class="stage-error-actions">
-              <button class="btn-primary" onclick="retryLoad()">↺ Réessayer</button>
-              <button class="btn-ghost" onclick="openInTab()">↗ Ouvrir</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <div id="page-container">
       <!-- HOME -->
       <section id="page-home" class="page active">
         <div class="hero">
@@ -185,17 +95,17 @@
             <div class="input-row">
               <input type="text" id="main-url-input" class="url-input"
                 placeholder="Collez un lien YouTube, un Magnet torrent ou une URL direct..."
-                oninput="onMainInput()" onkeydown="if(event.key==='Enter')loadFromHome()">
+                oninput="onMainInput()">
               <button class="btn-primary" id="home-load-btn" onclick="loadFromHome()">LIRE</button>
             </div>
             <div class="input-hint" id="input-hint"></div>
           </div>
 
           <div class="quick-features">
-            <div class="feature-item"><span>🚀</span> Stream Torrent instantané</div>
-            <div class="feature-item"><span>📂</span> Gestion de collections</div>
-            <div class="feature-item"><span>🎧</span> Extraction audio HD</div>
-            <div class="feature-item"><span>📝</span> Sous-titres personnalisés</div>
+            <div class="feature-item"><span><i class="fas fa-rocket"></i></span> Stream Torrent instantané</div>
+            <div class="feature-item"><span><i class="fas fa-folder-open"></i></span> Gestion de collections</div>
+            <div class="feature-item"><span><i class="fas fa-headphones"></i></span> Extraction audio HD</div>
+            <div class="feature-item"><span><i class="fas fa-file-alt"></i></span> Sous-titres personnalisés</div>
           </div>
         </div>
 
@@ -210,26 +120,88 @@
         <div class="player-container">
           <div class="player-main">
             <div class="player-header">
-              <button class="btn-back" onclick="showPage('home')">←</button>
+              <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i></button>
               <h2 id="player-breadcrumb" class="video-title-header">Chargement...</h2>
               <div class="player-actions">
-                <button class="btn-icon" onclick="toggleCinema()" title="Mode Cinéma">⛶</button>
+                <button class="btn-icon" onclick="toggleCinema()" title="Mode Cinéma" id="btn-cinema"><i class="fas fa-expand"></i></button>
                 <google-cast-launcher id="cast-button" style="width: 24px; height: 24px; cursor: pointer;"></google-cast-launcher>
-                <button class="btn-icon" onclick="openInTab()" title="Ouvrir dans un onglet">↗</button>
+                <button class="btn-icon" onclick="openInTab()" title="Ouvrir dans un onglet"><i class="fas fa-external-link-alt"></i></button>
               </div>
             </div>
 
-            <div id="player-stage" class="player-stage">
-              <video id="main-video" controls autoplay playsinline></video>
-              <iframe id="embed-iframe" style="display:none;width:100%;height:100%;border:none;" allowfullscreen></iframe>
-              <div id="stage-spinner" class="spinner-overlay hidden">
-                <div class="spinner"></div>
-                <p id="spinner-label">Initialisation...</p>
+            <div class="player-stage" id="player-stage">
+              <video id="main-video" autoplay playsinline preload="metadata"></video>
+
+              <!-- Netflix-style Custom Controls -->
+              <div class="netflix-controls" id="netflix-controls" role="region" aria-label="Contrôles du lecteur">
+                <!-- Top bar -->
+                <div class="n-top">
+                  <button class="n-btn n-back" onclick="goBack()" title="Retour" aria-label="Retour"><i class="fas fa-arrow-left"></i></button>
+                  <div class="n-title" id="n-video-title" aria-live="polite">StreamVault</div>
+                  <div class="n-top-right">
+                    <button class="n-btn" onclick="toggleSidebarSection('playlist-block')" title="Playlist" aria-label="Afficher la playlist" aria-expanded="false" aria-controls="playlist-block"><i class="fas fa-list"></i></button>
+                    <button class="n-btn" onclick="toggleSidebarSection('sidebar-queue-block')" title="Queue" aria-label="Afficher la queue" aria-expanded="false" aria-controls="sidebar-queue-block"><i class="fas fa-layer-group"></i></button>
+                    <button class="n-btn" onclick="toggleSidebarSection('diag-settings')" title="Diagnostic & Paramètres" aria-label="Afficher les paramètres" aria-expanded="false" aria-controls="diag-settings"><i class="fas fa-cog"></i></button>
+                  </div>
+                </div>
+
+                <!-- Middle controls (Play/Pause/Seek) -->
+                <div class="n-middle">
+                  <button class="n-btn n-big" onclick="nSeek(-10)" title="Reculer 10s" aria-label="Reculer de 10 secondes"><i class="fas fa-backward"></i></button>
+                  <button class="n-btn n-play-pause" id="n-play-pause-big" onclick="nTogglePlay()" aria-label="Lecture / Pause"><i class="fas fa-play"></i></button>
+                  <button class="n-btn n-big" onclick="nSeek(10)" title="Avancer 10s" aria-label="Avancer de 10 secondes"><i class="fas fa-forward"></i></button>
+                </div>
+
+                <!-- Bottom controls -->
+                <div class="n-bottom">
+                  <div class="n-progress-container" id="n-progress-container" role="slider" aria-label="Position de lecture" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+                    <div class="n-progress-bar">
+                      <div class="n-progress-fill" id="n-progress-fill"></div>
+                      <div class="n-progress-handle"></div>
+                    </div>
+                  </div>
+
+                  <div class="n-bottom-controls">
+                    <div class="n-left">
+                      <button class="n-btn" onclick="nTogglePlay()" id="n-play-btn" aria-label="Lecture / Pause"><i class="fas fa-play"></i></button>
+                      <button class="n-btn" onclick="nSeek(-10)" aria-label="Reculer 10s"><i class="fas fa-rotate-left"></i></button>
+                      <button class="n-btn" onclick="nSeek(10)" aria-label="Avancer 10s"><i class="fas fa-rotate-right"></i></button>
+
+                      <div class="n-volume-group">
+                        <button class="n-btn" id="n-volume-btn" onclick="nToggleMute()" aria-label="Couper le son"><i class="fas fa-volume-up"></i></button>
+                        <input type="range" class="n-volume-slider" id="n-volume-slider" min="0" max="1" step="0.05" value="1" aria-label="Volume">
+                      </div>
+
+                      <div class="n-time" aria-live="off">
+                        <span id="n-current-time">0:00</span> / <span id="n-duration">0:00</span>
+                      </div>
+                    </div>
+
+                    <div class="n-right">
+                      <button class="n-btn" id="n-next-btn" onclick="playNextPlaylistItem()" title="Suivant" aria-label="Vidéo suivante"><i class="fas fa-step-forward"></i></button>
+                      <button class="n-btn" onclick="openVfp()" title="Audio & Sous-titres" aria-label="Options audio et sous-titres"><i class="fas fa-closed-captioning"></i></button>
+                      <button class="n-btn" onclick="nToggleFullscreen()" title="Plein écran" aria-label="Plein écran"><i class="fas fa-expand"></i></button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div id="stage-error" class="error-overlay" style="display:none">
-                <span class="error-icon">⚠️</span>
-                <p id="stage-error-msg">Erreur de lecture</p>
-                <button class="btn-primary btn-sm" onclick="retryLoad()">RÉESSAYER</button>
+
+              <iframe id="embed-iframe" style="display:none;position:absolute;inset:0;width:100%;height:100%;border:none;" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+
+              <div class="stage-spinner hidden" id="stage-spinner">
+                <div class="spinner-ring"></div>
+                <div class="spinner-label" id="spinner-label">Connexion…</div>
+                <div class="spinner-sub" id="spinner-sub"></div>
+              </div>
+
+              <div class="stage-error" id="stage-error" style="display:none">
+                <div class="stage-error-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                <h3>Lecture impossible</h3>
+                <p id="stage-error-msg"></p>
+                <div class="stage-error-actions">
+                  <button class="btn-primary" onclick="retryLoad()"><i class="fas fa-sync"></i> Réessayer</button>
+                  <button class="btn-ghost" onclick="openInTab()"><i class="fas fa-external-link-alt"></i> Ouvrir</button>
+                </div>
               </div>
             </div>
 
@@ -241,30 +213,53 @@
               </div>
             </div>
 
-            <!-- SUBTITLES PANEL -->
-            <div class="subtitles-manager sidebar-block">
+            <!-- VIDEO FORMATS PANEL -->
+            <div id="video-formats-panel" class="video-formats-panel" style="display:none">
+              <div class="vfp-header">
+                <div class="vfp-tabs">
+                  <button class="vfp-tab active" onclick="setVfpTab('formats-video', this)">Vidéo</button>
+                  <button class="vfp-tab" onclick="setVfpTab('formats-audio', this)">Audio</button>
+                  <button class="vfp-tab" onclick="setVfpTab('formats-subs', this)">Sous-titres</button>
+                </div>
+                <button class="btn-icon" onclick="closeVfp()"><i class="fas fa-times"></i></button>
+              </div>
+              <div id="vfp-formats-video" class="vfp-content active vfp-grid"></div>
+              <div id="vfp-formats-audio" class="vfp-content vfp-grid"></div>
+              <div id="vfp-formats-subs" class="vfp-content vfp-grid"></div>
+            </div>
+
+            <div id="dl-bar" class="dl-bar" style="display:none">
+              <div class="dl-bar-info">
+                <div id="dl-bar-title" class="dl-bar-title"></div>
+                <div class="dl-bar-progress-wrap">
+                  <div class="dl-bar-progress-track"><div id="dl-bar-fill" class="dl-bar-progress-fill"></div></div>
+                  <div id="dl-bar-pct" class="dl-bar-pct">0%</div>
+                </div>
+                <div id="dl-bar-meta" class="dl-bar-meta"></div>
+              </div>
+              <div class="dl-bar-actions">
+                <button id="dl-bar-save-btn" class="btn-primary btn-sm" onclick="saveDlFile()" style="display:none">Sauvegarder</button>
+                <button class="btn-icon" onclick="hideDlBar()"><i class="fas fa-times"></i></button>
+              </div>
+            </div>
+
+            <!-- SUBTITLES MANAGER (below player) -->
+            <div class="sidebar-block" id="subs-block" style="display:none">
               <div class="sidebar-block-title">SOUS-TITRES</div>
               <div id="subs-list" class="subs-list"></div>
-              <div class="sub-upload-row">
-                <input type="text" id="external-sub-url" placeholder="Lien .srt ou .vtt">
-                <button class="btn-tiny" onclick="loadExternalSub()">Ajouter</button>
-                <label class="btn-tiny file-label">
-                  Fichier <input type="file" id="external-sub-file" accept=".srt,.vtt" onchange="uploadExternalSub(this)" style="display:none">
-                </label>
-              </div>
             </div>
           </div>
 
-          <aside class="player-sidebar">
+          <aside class="player-sidebar" id="player-sidebar">
             <!-- PLAYLIST -->
             <div class="sidebar-block" id="playlist-block" style="display:none">
               <div class="sidebar-block-title">PLAYLIST <span class="count-badge" id="playlist-count">0</span></div>
               <div id="playlist-list" class="playlist-items"></div>
             </div>
             <!-- QUEUE -->
-            <div class="sidebar-block">
-              <div class="sidebar-block-title">FILE D'ATTENTE</div>
-              <div id="sidebar-queue-list" class="queue-items"></div>
+            <div class="sidebar-block" id="sidebar-queue-block">
+              <div class="sidebar-block-title">FILE D'ATTENTE <span class="count-badge" id="sidebar-queue-count">0</span></div>
+              <div id="sidebar-queue-list" class="sidebar-queue-list"></div>
             </div>
             <!-- HISTORY -->
             <div class="sidebar-block">
@@ -275,15 +270,146 @@
         </div>
       </section>
 
-      <!-- Subtitles -->
-      <div class="sidebar-block" id="subs-block" style="display:none">
-        <div class="sidebar-block-title">Sous-titres actifs</div>
-        <div class="subs-list" id="subs-list"></div>
-      </div>
+      <!-- DOWNLOADER PAGE -->
+      <section id="page-downloader" class="page">
+        <div class="dl-layout">
+          <div class="dl-header">
+            <h1 class="page-title">Téléchargeur</h1>
+            <p class="page-sub">Récupérez vos vidéos pour une lecture hors-ligne.</p>
+          </div>
 
-      <!-- Diagnostic & Settings grouped -->
+          <div class="auth-card">
+            <div class="auth-card-header">
+              <div class="auth-card-title">Statut yt-dlp</div>
+              <div id="auth-status-grid" class="auth-status-grid"></div>
+            </div>
+            <textarea id="yt-cookies-input" class="auth-cookie-input" placeholder="Collez ici le contenu de votre fichier cookies (Netscape format)..."></textarea>
+            <div class="auth-card-actions">
+              <button class="btn-primary btn-sm" onclick="saveYtdlCookiesFromUi()">Sauvegarder Cookies</button>
+              <button class="btn-danger-sm" onclick="clearYtdlCookiesFromUi()">Effacer Cookies</button>
+            </div>
+          </div>
+
+          <div class="dl-input-card">
+            <div class="input-row">
+              <input type="text" id="dl-url-input" class="url-input" placeholder="Lien de la vidéo...">
+              <button class="btn-primary" id="dl-analyze-btn" onclick="analyzeDl()">Analyser</button>
+            </div>
+          </div>
+
+          <div id="dl-info-panel" class="dl-info-panel" style="display:none">
+             <div class="dl-info-header">
+                <img id="dl-thumb" src="" alt="" style="width:120px;border-radius:8px">
+                <div class="dl-info-text">
+                  <div id="dl-title" style="font-weight:700;margin-bottom:4px"></div>
+                  <div id="dl-meta" class="dl-meta"></div>
+                </div>
+             </div>
+             <div class="format-tabs">
+                <button class="fmt-tab active" onclick="setFmtTab('video', this)">Vidéo</button>
+                <button class="fmt-tab" onclick="setFmtTab('audio', this)">Audio</button>
+                <button class="fmt-tab" onclick="setFmtTab('subs', this)">Sous-titres</button>
+             </div>
+             <div id="fmt-video" class="fmt-panel active"><div id="formats-video" class="formats-grid"></div></div>
+             <div id="fmt-audio" class="fmt-panel"><div id="formats-audio" class="formats-grid"></div></div>
+             <div id="fmt-subs" class="fmt-panel"><div id="formats-subs" class="formats-grid"></div></div>
+          </div>
+
+          <div id="dl-playlist-section" style="display:none;margin-top:20px">
+            <div class="dl-playlist-header">
+              <div>
+                <h3 id="dl-playlist-title"></h3>
+                <p id="dl-playlist-info" class="dl-meta"></p>
+              </div>
+              <div class="dl-pl-actions">
+                <button class="btn-primary btn-sm" onclick="dlPlaylistSelected()">Tout télécharger</button>
+                <button class="btn-ghost btn-sm" onclick="addPlaylistToQueue()">Ajouter à la queue</button>
+              </div>
+            </div>
+            <div class="playlist-select-bar">
+               <label><input type="checkbox" checked onchange="toggleSelectAll(this.checked)"> Tout sélectionner</label>
+               <span id="pl-select-count"></span>
+            </div>
+            <div id="dl-playlist-items" class="dl-playlist-items"></div>
+          </div>
+
+          <div class="dl-list-section">
+            <h2 class="section-title">Téléchargements <span id="dl-active-count" class="count-badge"></span></h2>
+            <div id="dl-list" class="dl-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- QUEUE PAGE -->
+      <section id="page-queue" class="page">
+        <div class="queue-layout">
+          <div class="queue-header">
+            <h1 class="page-title">File d'attente</h1>
+            <div class="queue-actions">
+              <button class="btn-primary btn-sm" onclick="playNextQueue()"><i class="fas fa-play"></i> Lire le suivant</button>
+              <button class="btn-ghost btn-sm" onclick="shuffleQueue()"><i class="fas fa-random"></i> Mélanger</button>
+              <button class="btn-danger-sm" onclick="clearQueue()"><i class="fas fa-trash"></i> Vider</button>
+            </div>
+          </div>
+          <div class="queue-add-row">
+            <input type="text" id="queue-url-input" class="url-input" placeholder="Ajouter un lien à la file...">
+            <button class="btn-primary" onclick="addToQueueManual()">Ajouter</button>
+          </div>
+          <div id="queue-list" class="queue-list"></div>
+          <div id="queue-empty" class="diag-empty" style="display:none">La file d'attente est vide.</div>
+        </div>
+      </section>
+
+      <!-- SEARCH PAGE -->
+      <section id="page-search" class="page">
+        <div class="page-header">
+          <h1 class="page-title">Résultats pour "<span id="search-query-display"></span>"</h1>
+        </div>
+        <div id="search-loading" class="diag-empty" style="display:none"><i class="fas fa-spinner fa-spin"></i> Recherche en cours...</div>
+        <div class="cards-grid" id="search-results-grid"></div>
+      </section>
+
+      <!-- COLLECTIONS -->
+      <section id="page-collections" class="page">
+        <div id="col-list-view">
+          <div class="page-header">
+            <h1 class="page-title">Mes Collections</h1>
+            <button class="btn-primary btn-sm" onclick="openCreateCollection()"><i class="fas fa-plus"></i> Nouvelle</button>
+          </div>
+          <div class="col-grid" id="col-grid"></div>
+        </div>
+
+        <div id="col-detail-view" style="display:none">
+          <div class="page-header">
+            <div style="display:flex;align-items:center;gap:15px">
+              <button class="btn-back" onclick="closeCollectionDetail()"><i class="fas fa-arrow-left"></i></button>
+              <div id="col-detail-icon" style="font-size:32px"></div>
+              <div>
+                <h1 class="page-title" id="col-detail-name"></h1>
+                <p id="col-detail-meta" class="dl-meta"></p>
+              </div>
+            </div>
+            <div class="queue-actions">
+              <button class="btn-primary btn-sm" onclick="playCollection()"><i class="fas fa-play"></i> Tout lire</button>
+              <button class="btn-ghost btn-sm" onclick="addCollectionToQueue()"><i class="fas fa-list-ul"></i> Ajouter à la queue</button>
+              <button class="btn-danger-sm" onclick="deleteCurrentCollection()"><i class="fas fa-trash"></i> Supprimer</button>
+            </div>
+          </div>
+          <div class="cards-grid" id="col-detail-grid"></div>
+        </div>
+      </section>
+
+      <!-- LIBRARY -->
+      <section id="page-library" class="page">
+        <div class="page-header">
+          <h1 class="page-title">Historique Complet</h1>
+          <button class="btn-danger btn-sm" onclick="clearAllHistory()"><i class="fas fa-trash"></i> TOUT EFFACER</button>
+        </div>
+        <div class="cards-grid" id="library-grid"></div>
+      </section>
+
+      <!-- DIAGNOSTIC & SETTINGS (Hidden by default, shown via player) -->
       <div id="diag-settings" style="display:none">
-        <!-- Diagnostic -->
         <div class="sidebar-block">
           <div class="sidebar-block-title-row">
             <span class="sidebar-block-title">Diagnostic</span>
@@ -293,55 +419,78 @@
             <div class="diag-empty">Lance une vidéo.</div>
           </div>
         </div>
-
-        <!-- Quality/Method bars moved here for "Settings" feel -->
         <div id="sidebar-methods" class="sidebar-block" style="margin-top:10px">
           <div class="sidebar-block-title">Méthodes & Qualité</div>
           <div id="sidebar-method-content" style="padding:10px"></div>
         </div>
-        <div id="dl-info-panel" class="dl-info-panel" style="display:none">
-          <!-- Info results -->
-        </div>
-        <div class="dl-active-section">
-          <h2 class="section-title">Téléchargements en cours</h2>
-          <div id="dl-list" class="dl-list"></div>
-        </div>
-      </section>
+      </div>
 
-      <!-- LIBRARY & COLLECTIONS (Simplified for now) -->
-      <section id="page-collections" class="page">
-        <div class="page-header">
-          <h1 class="page-title">Mes Collections</h1>
-          <button class="btn-primary btn-sm" onclick="openCreateCollection()">+ Nouvelle</button>
-        </div>
-        <div class="col-grid" id="col-grid"></div>
-      </section>
-
-      <section id="page-library" class="page">
-        <div class="page-header">
-          <h1 class="page-title">Historique Complet</h1>
-          <button class="btn-danger btn-sm" onclick="clearAllHistory()">TOUT EFFACER</button>
-        </div>
-        <div class="cards-grid" id="library-grid"></div>
-      </section>
-
-    </div>
+    </div> <!-- end page-container -->
   </main>
+</div>
+
+<div id="cinema-backdrop" style="display:none"></div>
+<div id="next-video-bar" class="next-video-bar" style="display:none">
+  <div class="nvb-info">
+    <span class="nvb-label">Suivant</span>
+    <span class="nvb-title" id="nvb-title"></span>
+  </div>
+  <button class="btn-primary btn-sm" onclick="playNextPlaylistItem()">Lire maintenant</button>
 </div>
 
 <!-- MODALS -->
 <div class="modal-overlay" id="modal-collection" style="display:none">
   <div class="modal">
-    <div class="modal-header"><h3>Collection</h3><button onclick="closeModal('modal-collection')">✕</button></div>
+    <div class="modal-header"><h3 id="modal-col-title">Collection</h3><button onclick="closeModal('modal-collection')"><i class="fas fa-times"></i></button></div>
     <div class="modal-body">
       <input type="text" id="col-form-name" placeholder="Nom...">
       <textarea id="col-form-desc" placeholder="Description..."></textarea>
+      <input type="hidden" id="col-form-icon" value='<i class="fas fa-film"></i>'>
+      <input type="hidden" id="col-form-color" value="#e5091a">
+      <div class="modal-field">
+        <label>Icône</label>
+        <div id="icon-picker" class="icon-picker">
+          <span onclick='setColIcon("<i class=\"fas fa-film\"></i>", this)'><i class="fas fa-film"></i></span>
+          <span onclick='setColIcon("<i class=\"fas fa-folder\"></i>", this)'><i class="fas fa-folder"></i></span>
+          <span onclick='setColIcon("<i class=\"fas fa-history\"></i>", this)'><i class="fas fa-history"></i></span>
+          <span onclick='setColIcon("<i class=\"fas fa-utensils\"></i>", this)'><i class="fas fa-utensils"></i></span>
+          <span onclick='setColIcon("<i class=\"fas fa-video\"></i>", this)'><i class="fas fa-video"></i></span>
+          <span onclick='setColIcon("<i class=\"fas fa-film\"></i>", this)'><i class="fas fa-film"></i></span>
+          <span onclick='setColIcon("<i class=\"fas fa-tv\"></i>", this)'><i class="fas fa-tv"></i></span>
+          <span onclick='setColIcon("<i class=\"fas fa-compact-disc\"></i>", this)'><i class="fas fa-compact-disc"></i></span>
+          <span onclick='setColIcon("<i class=\"fas fa-headphones\"></i>", this)'><i class="fas fa-headphones"></i></span>
+          <span onclick='setColIcon("<i class=\"fas fa-folder-open\"></i>", this)'><i class="fas fa-folder-open"></i></span>
+          <span onclick='setColIcon("<i class=\"fas fa-video\"></i>", this)'><i class="fas fa-video"></i></span>
+        </div>
+      </div>
+      <div class="modal-field">
+        <label>Couleur</label>
+        <div class="color-picker">
+          <div class="cp-btn active" style="background:#e5091a" data-color="#e5091a" onclick="setColColor('#e5091a', this)"></div>
+          <div class="cp-btn" style="background:#00cfff" data-color="#00cfff" onclick="setColColor('#00cfff', this)"></div>
+          <div class="cp-btn" style="background:#00e676" data-color="#00e676" onclick="setColColor('#00e676', this)"></div>
+          <div class="cp-btn" style="background:#ffd740" data-color="#ffd740" onclick="setColColor('#ffd740', this)"></div>
+          <div class="cp-btn" style="background:#9c27b0" data-color="#9c27b0" onclick="setColColor('#9c27b0', this)"></div>
+        </div>
+      </div>
     </div>
     <div class="modal-footer"><button class="btn-primary" onclick="submitCollectionForm()">Sauvegarder</button></div>
   </div>
 </div>
 
-<div id="toast-container"></div>
+<div class="modal-overlay" id="modal-add-to-col" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3>Ajouter à une collection</h3><button onclick="closeModal('modal-add-to-col')"><i class="fas fa-times"></i></button></div>
+    <div class="modal-body">
+      <div id="add-to-col-list" class="add-to-col-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast">
+  <div id="toast-icon" class="toast-icon"></div>
+  <div id="toast-msg"></div>
+</div>
 
 <script src="/static/js/api.js"></script>
 <script src="/static/js/player.js"></script>
