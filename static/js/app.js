@@ -372,17 +372,22 @@ async function clearAllHistory() {
 let _toastTimer;
 function toast(msg, icon = '✓') {
   const el = document.getElementById('toast');
-  document.getElementById('toast-msg').textContent = msg;
-  document.getElementById('toast-icon').textContent = icon;
+  const msgEl = document.getElementById('toast-msg');
+  const iconEl = document.getElementById('toast-icon');
+  if (!el || !msgEl || !iconEl) return;
+
+  msgEl.textContent = msg;
+  iconEl.textContent = icon;
+
   el.classList.add('show');
   clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
 }
 
 // ── Intercept polling (from extension) ─────────────────
 setInterval(async () => {
   try {
-    const res  = await fetch('/api/intercept/latest');
+    const res  = await API.fetch('/api/intercept/latest');
     const data = await res.json();
     if (data?.url) {
       document.getElementById('main-url-input').value    = data.url;

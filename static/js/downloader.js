@@ -197,7 +197,7 @@ function makeFormatRow(f, url) {
 async function startDownload(url, formatId, ext) {
   toast('Démarrage du téléchargement…', '↓');
   try {
-    const res = await fetch('/api/ytdl/download', {
+    const res = await API.fetch('/api/ytdl/download', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url, format_id: formatId, ext }),
@@ -216,7 +216,7 @@ async function startDownload(url, formatId, ext) {
 async function startSubDownload(url, lang, ext) {
   toast('Téléchargement sous-titres…', '📝');
   try {
-    const res = await fetch('/api/ytdl/download', {
+    const res = await API.fetch('/api/ytdl/download', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url, format_id: 'bestaudio', ext: 'm4a', sub_lang: lang }),
@@ -230,7 +230,7 @@ function trackDownload(dlId) {
   if (_dlPollTimers[dlId]) return;
   _dlPollTimers[dlId] = setInterval(async () => {
     try {
-      const res  = await fetch(`/api/ytdl/progress?id=${dlId}`);
+      const res  = await API.fetch(`/api/ytdl/progress?id=${dlId}`);
       const data = await res.json();
       updateDlItem(data);
       if (['done','error','cancelled'].includes(data.status)) {
@@ -269,7 +269,7 @@ function updateDlItem(dl) {
 
 async function refreshDlList() {
   try {
-    const res  = await fetch('/api/downloads');
+    const res  = await API.fetch('/api/downloads');
     const data = await res.json();
     renderDlList(data);
   } catch {}
@@ -332,7 +332,7 @@ function renderDlList(data) {
 }
 
 async function cancelDl(id) {
-  await fetch('/api/ytdl/cancel', {
+  await API.fetch('/api/ytdl/cancel', {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({id}),
   });
@@ -406,8 +406,8 @@ async function analyzeDl() {
   try {
     // Check if playlist first
     const [plRes, infoRes] = await Promise.allSettled([
-      fetch(`/api/playlist?url=${encodeURIComponent(url)}`).then(r=>r.json()),
-      fetch('/api/ytdl/info', {
+      API.fetch(`/api/playlist?url=${encodeURIComponent(url)}`).then(r=>r.json()),
+      API.fetch('/api/ytdl/info', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ url }),
       }).then(r=>r.json()),
@@ -508,7 +508,7 @@ async function dlPlaylistSelected() {
 
 async function batchDownload(urls) {
   toast(`↓ ${urls.length} téléchargements démarrés`, '↓');
-  const res = await fetch('/api/ytdl/download/batch', {
+  const res = await API.fetch('/api/ytdl/download/batch', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ urls, format_id:'best', ext:'mp4' }),
   });
@@ -525,7 +525,7 @@ async function batchDownload(urls) {
 async function addPlaylistToQueue() {
   if (!_dlPlaylist?.items?.length) return;
   for (const item of _dlPlaylist.items) {
-    await fetch('/api/queue', {
+    await API.fetch('/api/queue', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ action:'add', item:{ url:item.url, title:item.title||item.url } }),
     });

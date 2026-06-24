@@ -8,6 +8,14 @@ let tabId   = null;
 
 // ── Init ────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
+  // Sync token from localStorage if svUrl is local
+  // Note: crypto.randomUUID() might not be available in all contexts, but Extension popups usually have it.
+  let { sv_device_token } = await chrome.storage.local.get(['sv_device_token']);
+  if (!sv_device_token) {
+    sv_device_token = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+    await chrome.storage.local.set({ sv_device_token });
+  }
+
   // Tabs
   document.querySelectorAll('.tab').forEach(t => {
     t.addEventListener('click', () => switchTab(t.dataset.tab));

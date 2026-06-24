@@ -1,0 +1,11 @@
+INFO:     Started server process [41219]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:5000 (Press CTRL+C to quit)
+  [WARN] yt-dlp absent — pip install yt-dlp
+  [WARN] ffmpeg absent — transcodage désactivé
+INFO:     127.0.0.1:37114 - "GET /api/history HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [41219]

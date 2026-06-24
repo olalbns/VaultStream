@@ -166,15 +166,22 @@ function updateBadge(tabId) {
 // â”€â”€ Envoi Ã  StreamVault â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 async function sendToStreamVault(entry) {
   try {
+    const { sv_device_token } = await chrome.storage.local.get(['sv_device_token']);
+
     const body = JSON.stringify({
       url:     entry.url,
       headers: entry.headers,
       referer: entry.referer,
     });
 
+    const headers = { 'Content-Type': 'application/json' };
+    if (sv_device_token) {
+      headers['X-Device-Token'] = sv_device_token;
+    }
+
     const res = await fetch(`${svUrl}/api/intercept`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body:    body,
     });
 
