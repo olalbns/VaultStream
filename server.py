@@ -586,13 +586,11 @@ async def api_resolve(url: str, referer: Optional[str] = None):
         steps.append("hakunaymatata-api")
         try:
             dls, caps, _ = api_hakunaymatata(url, ch or None)
+            if not dls:
+                raise RuntimeError("Aucun stream trouvé via hakunaymatata")
             streams = [{**d, "proxy_url": f"/api/proxy?url={urllib.parse.quote(d['url'], safe='')}"}
                        for d in dls]
-            # Try to get a real title from URL or metadata
             title = "Hakuna Video"
-            if "formats" in dls[0]: # might be different structure
-                pass
-
             return {
                 "ok": True,
                 "method": "hakunaymatata-api",
@@ -767,6 +765,12 @@ async def post_collections(data: Dict[str, Any], x_device_token: str = Header(No
             i["id"] = hashlib.md5(i["url"].encode()).hexdigest()[:10]; i["added"] = int(time.time())
             if i["id"] not in ex: c["items"].append(i); ex.add(i["id"]); added += 1
         save_json(f, c); return {"ok": True, "added": added, "collection": c}
+    elif a == "remove_item":
+        cid = data.get("col_id", ""); f = ud / f"{cid}.json"
+        if not f.exists(): raise HTTPException(status_code=404)
+        c = load_json(f, {}); item_id = data.get("item_id", "")
+        c["items"] = [x for x in c.get("items", []) if x.get("id") != item_id]
+        save_json(f, c); return {"ok": True, "collection": c}
     return {"ok": False}
 
 @app.get("/api/search")
@@ -864,9 +868,80 @@ async def intercept_latest():
     if not f.exists(): return {"url": None}
     d = load_json(f, {}); f.unlink(); return d
 
+@app.post("/api/intercept")
+async def intercept_post(data: Dict[str, Any]):
+    """Reçoit une URL interceptée depuis l'extension navigateur."""
+    url = (data.get("url") or "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="url manquante")
+    headers = data.get("headers") or {}
+    referer = data.get("referer") or ""
+    payload = {"url": url, "headers": headers, "referer": referer, "ts": int(time.time())}
+    save_json(DATA_DIR / "intercepted.json", payload)
+    return {"ok": True}
+
 # Standard pass-through for other APIs
 @app.get("/api/ytdl/auth/status")
 async def get_ytdl_auth_status(): return {"ok": True, **_yt_dlp_auth_state()}
+
+@app.post("/api/ytdl/cookies/save")
+async def api_ytdl_cookies_save(data: Dict[str, Any]):
+    """Sauvegarde un fichier cookies Netscape fourni par l'utilisateur."""
+    text = (data.get("text") or "").strip()
+    if not text:
+        return {"ok": False, "error": "Texte vide"}
+    try:
+        _write_cookie_file(YTDLP_RUNTIME_COOKIE_FILE, text)
+        return {"ok": True}
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/ytdl/cookies/clear")
+async def api_ytdl_cookies_clear():
+    """Supprime le fichier cookies runtime."""
+    try:
+        if YTDLP_RUNTIME_COOKIE_FILE.exists():
+            YTDLP_RUNTIME_COOKIE_FILE.unlink()
+        return {"ok": True}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/ytdl/retry")
+async def api_ytdl_retry(data: Dict[str, Any]):
+    """Relance un téléchargement échoué à partir de son ID en mémoire."""
+    dl_id = data.get("id")
+    with _dl_lock:
+        dl = _downloads.get(dl_id)
+    if not dl:
+        return {"ok": False, "error": "Téléchargement introuvable"}
+    new_id = str(uuid.uuid4())[:8]
+    with _dl_lock:
+        _cancel_events[new_id] = threading.Event()
+    dl_manager.add(new_id, ytdlp_download, dl.get("url", ""), "best", "mp4", None, load_custom_headers() or None, dl.get("title", ""))
+    return {"ok": True, "id": new_id}
+
+@app.get("/api/probe")
+async def api_probe(url: str):
+    """Sonde une URL : accessible, type MIME, seekable."""
+    t = urllib.parse.unquote(url)
+    h = build_headers(t)
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, verify=False) as client:
+            r = await client.head(t, headers=h, timeout=10)
+            ct = r.headers.get("Content-Type", mime_from_url(t))
+            cl = r.headers.get("Content-Length")
+            ar = r.headers.get("Accept-Ranges", "")
+            return {
+                "ok": r.status_code < 400,
+                "status": r.status_code,
+                "content_type": ct,
+                "content_length": int(cl) if cl else None,
+                "seekable": "bytes" in ar,
+            }
+    except Exception as e:
+        return {"ok": False, "status": 0, "error": str(e)}
 
 @app.post("/api/ytdl/download")
 async def api_ytdl_download(data: Dict[str, Any]):
