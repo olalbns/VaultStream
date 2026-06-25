@@ -173,6 +173,18 @@ const Player = (() => {
     const res = await fetch(`/api/resolve?url=${encodeURIComponent(url)}&referer=${encodeURIComponent(referer)}`);
     const data = await res.json();
     pub.diag(data.ok ? 'ok' : 'warn', `Résolution: ${data.method}`, (data.steps || []).join(' → '));
+
+    // Cas spécial : torrent — le player HTML5 ne peut pas lire un flux torrent directement
+    if (data.method === 'torrent') {
+      unspin();
+      showErr('Lien Torrent détecté 🧲 — Le streaming torrent nécessite que le moteur WebTorrent soit actif (node scripts/torrent_engine.js). Le fichier sera téléchargé dans data/downloads.');
+      throw new Error('Torrent: moteur WebTorrent requis');
+    }
+
+    if (!data.ok || (!data.proxy_url && !data.stream_url)) {
+      throw new Error(data.error || 'Résolution échouée — aucun stream trouvé');
+    }
+
     _streams = data.streams || [];
     renderQualityBar(_streams);
     if (data.captions?.length) renderSubtitles(data.captions);

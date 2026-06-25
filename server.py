@@ -506,8 +506,17 @@ def _extract_with_retry(url, base_opts, for_playlist=False):
         except Exception as e: last_err = e
     raise last_err or RuntimeError("no result")
 
+def _clean_url(url):
+    """Nettoie l'URL sans toucher aux magnets/infohash."""
+    s = str(url).strip()
+    if s.startswith('magnet:') or (len(s) == 40 and re.fullmatch(r'[a-fA-F0-9]{40}', s)):
+        return s
+    m = re.search(r'https?://[^\s<>"]+', s)
+    if m: s = m.group(0)
+    return normalize_youtube_url(strip_youtube_tracking_params(s))
+
 def ytdlp_resolve(url, custom_headers=None, referer=None):
-    url = normalize_youtube_url(strip_youtube_tracking_params(re.search(r"https?://[^\s<>\"]+", str(url)).group(0) if re.search(r"https?://[^\s<>\"]+", str(url)) else url))
+    url = _clean_url(url)
     with _cache_lock:
         c = _cache.get("r:"+url)
         if c and time.time() < c.get("expires", 0): return c
@@ -531,7 +540,7 @@ def ytdlp_resolve(url, custom_headers=None, referer=None):
     return res
 
 def ytdlp_info(url, custom_headers=None):
-    url = normalize_youtube_url(strip_youtube_tracking_params(re.search(r"https?://[^\s<>\"]+", str(url)).group(0) if re.search(r"https?://[^\s<>\"]+", str(url)) else url))
+    url = _clean_url(url)
     opts = {"quiet":True,"no_warnings":True,"noplaylist":True,"nocheckcertificate":True,"ignoreerrors":True,"no_color":True}
     apply_ytdlp_auth(opts, custom_headers)
     try: info = _extract_with_retry(url, opts)
@@ -551,7 +560,7 @@ def ytdlp_info(url, custom_headers=None):
     return {"title":info.get("title",""),"thumbnail":info.get("thumbnail",""),"duration":info.get("duration"),"uploader":info.get("uploader",""),"formats":fmts,"subtitles":[]}
 
 def ytdlp_playlist(url, custom_headers=None):
-    url = normalize_youtube_url(strip_youtube_tracking_params(re.search(r"https?://[^\s<>\"]+", str(url)).group(0) if re.search(r"https?://[^\s<>\"]+", str(url)) else url))
+    url = _clean_url(url)
     opts = {"quiet":True,"no_warnings":True,"extract_flat":"in_playlist","noplaylist":False,"playlistend":200}
     apply_ytdlp_auth(opts, custom_headers)
     info = _extract_with_retry(url, opts, True)
@@ -854,13 +863,25 @@ async def api_torrent_stream(request: Request, magnet: str, index: int = 0):
         raise HTTPException(status_code=502, detail=str(e))
 
 @app.get("/api/playlist")
-async def api_playlist(url: str): return {"ok": True, **ytdlp_playlist(urllib.parse.unquote(url))}
+async def api_playlist(url: str):
+    u = urllib.parse.unquote(url)
+    if u.startswith("magnet:") or (len(u) == 40 and re.fullmatch(r'[a-fA-F0-9]{40}', u)):
+        return {"ok": False, "is_playlist": False, "error": "Les liens magnets ne supportent pas les playlists", "items": []}
+    return {"ok": True, **ytdlp_playlist(u)}
 
 @app.get("/api/video/info")
-async def api_video_info(url: str): return {"ok": True, **ytdlp_info(url)}
+async def api_video_info(url: str):
+    u = urllib.parse.unquote(url)
+    if u.startswith("magnet:") or (len(u) == 40 and re.fullmatch(r'[a-fA-F0-9]{40}', u)):
+        return {"ok": False, "error": "Lien magnet — téléchargement via torrent_engine uniquement"}
+    return {"ok": True, **ytdlp_info(u)}
 
 @app.post("/api/ytdl/info")
-async def api_ytdl_info(data: Dict[str, Any]): return {"ok": True, **ytdlp_info(data.get("url", ""))}
+async def api_ytdl_info(data: Dict[str, Any]):
+    u = data.get("url", "")
+    if u.startswith("magnet:") or (len(u) == 40 and re.fullmatch(r'[a-fA-F0-9]{40}', u)):
+        return {"ok": False, "error": "Lien magnet — téléchargement via torrent_engine uniquement"}
+    return {"ok": True, **ytdlp_info(u)}
 
 @app.get("/api/intercept/latest")
 async def intercept_latest():
