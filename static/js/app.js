@@ -116,6 +116,9 @@ function onMainInput() {
   if (val.includes('.m3u8')) {
     setHint('Lien HLS/M3U8 détecté', 'ok'); return;
   }
+  if (val.startsWith('magnet:?xt=urn:btih:') || /^[a-fA-F0-9]{40}$/.test(val)) {
+    setHint('Lien Torrent détecté 🚀', 'ok'); return;
+  }
   if (/youtu/.test(val)) {
     setHint('Lien YouTube détecté', 'ok'); return;
   }
@@ -160,6 +163,8 @@ function setHint(msg, type = '') {
 function isValidInput(s) {
   if (!s) return false;
   if (s.startsWith('{') || s.startsWith('[')) return true; // JSON
+  if (s.startsWith('magnet:?xt=urn:btih:')) return true;
+  if (/^[a-fA-F0-9]{40}$/.test(s)) return true; // Infohash
   try { return /^https?:\/\//.test(new URL(s).href); } catch { return false; }
 }
 

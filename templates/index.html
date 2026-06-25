@@ -123,6 +123,8 @@
               <button class="btn-back" onclick="showPage('home')"><i class="fas fa-arrow-left"></i></button>
               <h2 id="player-breadcrumb" class="video-title-header">Chargement...</h2>
               <div class="player-actions">
+                <button class="btn-icon" onclick="transcodeCurrent()" title="Transcoder (FFmpeg)" id="btn-transcode"><i class="fas fa-magic"></i></button>
+                <button class="btn-icon" onclick="downloadCurrent()" title="Télécharger"><i class="fas fa-download"></i></button>
                 <button class="btn-icon" onclick="toggleCinema()" title="Mode Cinéma" id="btn-cinema"><i class="fas fa-expand"></i></button>
                 <google-cast-launcher id="cast-button" style="width: 24px; height: 24px; cursor: pointer;"></google-cast-launcher>
                 <button class="btn-icon" onclick="openInTab()" title="Ouvrir dans un onglet"><i class="fas fa-external-link-alt"></i></button>
