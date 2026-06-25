@@ -14,6 +14,7 @@ const Player = (() => {
 
   // ── Type detection ──────────────────────────────────
   const typeOf = url => {
+    if (url.startsWith('magnet:') || /^[a-fA-F0-9]{40}$/.test(url.trim())) return 'torrent';
     if (/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/(?:embed|shorts)\/)/i.test(url)) return 'youtube';
     if (/vimeo\.com\/(?:video\/)?(\d+)/i.test(url)) return 'vimeo';
     if (/\.(m3u8)(\?|#|$)/i.test(url)) return 'hls';
@@ -518,9 +519,12 @@ const Player = (() => {
       const playerPage = document.getElementById('page-player');
       if (playerPage && !playerPage.classList.contains('active')) {
         if (typeof showPage === 'function') showPage('player');
-        await new Promise(r => setTimeout(r, 80)); // laisser le DOM se render
+        await new Promise(r => setTimeout(r, 80));
       }
-      rawUrl = normalizeYoutubeUrl(rawUrl);
+      // Ne pas normaliser les magnets/infohash/JSON — seulement les URLs YouTube
+      const isMagnet = rawUrl.startsWith('magnet:') || /^[a-fA-F0-9]{40}$/.test(rawUrl.trim());
+      const isJson   = rawUrl.trim().startsWith('{') || rawUrl.trim().startsWith('[');
+      rawUrl = (isMagnet || isJson) ? rawUrl.trim() : normalizeYoutubeUrl(rawUrl);
       _url = rawUrl; _streams = [];
       pub.clearDiag(); showStage(); spin('Analyse…'); hideErr();
       const mbar = $('method-bar'); if (mbar) mbar.style.display = 'none';
@@ -552,7 +556,11 @@ const Player = (() => {
       pub.diag('info', `Type: ${type}`);
       try {
         let method = '';
-        if (type === 'youtube') {
+        if (type === 'torrent') {
+          unspin();
+          showErr('🧲 Lien Magnet détecté — Le player ne peut pas lire un torrent directement.\n\nUtilise la page Télécharger pour démarrer le téléchargement via WebTorrent.');
+          throw new Error('Torrent: utilise la page Télécharger');
+        } else if (type === 'youtube') {
           const id = ytId(rawUrl); if (!id) throw new Error('ID YouTube invalide');
           pub.diag('info', 'YouTube embed', `ID: ${id}`);
           method = loadEmbed(`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`, 'YOUTUBE');

@@ -512,6 +512,16 @@ async function loadFromHome() {
   if (!url) { setHint('Colle un lien ou JSON', 'error'); return; }
   if (!isValidInput(url)) { setHint('URL invalide — vérifie le format', 'error'); return; }
 
+  // Les magnets vont directement sur la page Télécharger
+  if (isMagnet) {
+    const dlInput = document.getElementById('dl-url-input');
+    if (dlInput) dlInput.value = url;
+    showPage('downloader');
+    setHint('');
+    setTimeout(() => analyzeDl(), 50);
+    return;
+  }
+
   setHint('Chargement…', 'info');
   const btn = document.getElementById('home-load-btn');
   if (btn) btn.disabled = true;

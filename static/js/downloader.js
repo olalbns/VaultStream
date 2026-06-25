@@ -59,8 +59,11 @@ function extractFirstUrl(text) {
 
 function normalizeYoutubeDlUrl(url) {
   if (!url) return url;
+  const s = String(url).trim();
+  // Ne jamais toucher aux magnets et infohash
+  if (s.startsWith('magnet:') || /^[a-fA-F0-9]{40}$/.test(s)) return s;
   try {
-    const u = new URL(extractFirstUrl(url));
+    const u = new URL(extractFirstUrl(s));
     const host = u.hostname.replace('www.', '').replace('m.youtube.com', 'youtube.com');
     if (host !== 'youtube.com' && host !== 'youtu.be') return u.href;
 
@@ -82,7 +85,7 @@ function normalizeYoutubeDlUrl(url) {
     }
     return /^[a-zA-Z0-9_-]{11}$/.test(id) ? `https://www.youtube.com/watch?v=${id}` : u.href;
   } catch {
-    return extractFirstUrl(url);
+    return extractFirstUrl(s) || s;
   }
 }
 
@@ -393,7 +396,9 @@ let _selectedItems = new Set();
 async function analyzeDl() {
   const raw = document.getElementById('dl-url-input').value.trim();
   if (!raw) { toast('Colle un lien', '<i class="fas fa-exclamation-triangle"></i>'); return; }
-  const url = normalizeYoutubeDlUrl(raw);
+
+  const isMagnet  = raw.startsWith('magnet:') || /^[a-fA-F0-9]{40}$/.test(raw);
+  const url = isMagnet ? raw : normalizeYoutubeDlUrl(raw);
   document.getElementById('dl-url-input').value = url;
   _dlUrl = url;
 
@@ -404,7 +409,38 @@ async function analyzeDl() {
   document.getElementById('dl-playlist-section').style.display = 'none';
   _dlPlaylist = null; _selectedItems.clear();
 
-  toast('Analyse en cours…', '<i class="fas fa-spinner fa-spin"></i>');
+  // ── Cas magnet / infohash ─────────────────────────────
+  if (isMagnet) {
+    btn.disabled = false; btn.textContent = 'Analyser';
+    // Afficher un panneau d'info simplifié pour les torrents
+    const infoPanel = document.getElementById('dl-info-panel');
+    document.getElementById('dl-thumb').src = '';
+    document.getElementById('dl-thumb').style.display = 'none';
+    document.getElementById('dl-title').textContent = 'Lien Torrent (Magnet)';
+    document.getElementById('dl-meta').innerHTML =
+      '<i class="fas fa-magnet"></i> Téléchargement via moteur WebTorrent';
+    document.getElementById('fmt-video').innerHTML = `
+      <div class="vfp-row" style="padding:16px">
+        <div class="fmt-badge both">TORRENT</div>
+        <div class="fmt-info">
+          <div class="fmt-res">Meilleure qualité disponible</div>
+          <div class="fmt-detail">Le fichier sera téléchargé dans data/downloads/</div>
+        </div>
+        <div class="fmt-actions">
+          <button class="btn-primary" style="font-size:11px;padding:6px 14px"
+            onclick="startDownload('${url.replace(/'/g,"\\'")}','best','mp4')">
+            <i class="fas fa-download"></i> Télécharger
+          </button>
+        </div>
+      </div>`;
+    document.getElementById('fmt-audio').innerHTML =
+      '<div style="padding:12px;color:var(--muted)">Non disponible pour les torrents</div>';
+    document.getElementById('fmt-subs').innerHTML =
+      '<div style="padding:12px;color:var(--muted)">Non disponible pour les torrents</div>';
+    infoPanel.style.display = 'block';
+    toast('<i class="fas fa-magnet"></i> Lien Magnet détecté — prêt à télécharger', '');
+    return;
+  }
 
   try {
     // Check if playlist first
