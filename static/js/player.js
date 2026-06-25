@@ -729,7 +729,7 @@ const Player = (() => {
   };
 
   document.addEventListener('DOMContentLoaded', () => {
-    pub.initCast();
+    try { pub.initCast(); } catch(e) { /* Cast SDK non disponible */ }
     const v = document.getElementById('main-video');
     const controls = document.getElementById('netflix-controls');
 
