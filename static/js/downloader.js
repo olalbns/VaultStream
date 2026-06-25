@@ -105,10 +105,10 @@ function renderDlInfo(info) {
   document.getElementById('dl-title').textContent = info.title || 'Sans titre';
 
   const meta = [];
-  if (info.uploader)   meta.push('<i class="fas fa-user"></i> ' + info.uploader);
+  if (info.uploader)   meta.push('<i class="fas fa-user"></i> ' + esc(info.uploader));
   if (info.duration)   meta.push('<i class="fas fa-clock"></i> ' + fmtDuration(info.duration));
   if (info.view_count) meta.push('<i class="fas fa-eye"></i> ' + info.view_count.toLocaleString());
-  document.getElementById('dl-meta').textContent = meta.join('  ·  ');
+  document.getElementById('dl-meta').innerHTML = meta.join('  ·  ');
 
   // Video formats
   const videoFmts = info.formats.filter(f => f.type === 'video+audio' || f.type === 'video');

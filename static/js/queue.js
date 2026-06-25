@@ -95,9 +95,11 @@ function renderQueue() {
   if (!list) return;
 
   if (!_queue.length) {
-    if (empty) empty.style.display = '';
     list.innerHTML = '';
-    list.appendChild(empty || document.createElement('div'));
+    if (empty) {
+      empty.style.display = '';
+      if (!list.contains(empty)) list.appendChild(empty);
+    }
     return;
   }
 
