@@ -328,7 +328,7 @@ const Player = (() => {
   }
   function showDlBarSave(filename, title) {
     const btn = $('dl-bar-save-btn'); if (btn) btn.style.display = '';
-    $('dl-bar-title').textContent = '<i class="fas fa-check"></i> ' + (title || filename || 'Téléchargé');
+    $('dl-bar-title').innerHTML = '<i class="fas fa-check"></i> ' + (title || filename || 'Téléchargé');
     $('dl-bar-fill').style.width = '100%';
     $('dl-bar-pct').textContent = '100%';
     $('dl-bar-meta').textContent = 'Prêt à sauvegarder';
@@ -338,6 +338,15 @@ const Player = (() => {
     if (!b) return '';
     if (b < 1048576) return (b / 1024).toFixed(0) + 'Ko';
     return (b / 1048576).toFixed(1) + 'Mo';
+  }
+  function fmtTime(s) {
+    if (!s || isNaN(s)) return '0:00';
+    s = Math.floor(s);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    return `${m}:${String(sec).padStart(2,'0')}`;
   }
   function esc(s) { return String(s).replace(/'/g, "\\'").replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
@@ -392,11 +401,11 @@ const Player = (() => {
       const btn = document.getElementById('btn-cinema');
       if (_cinemaActive) {
         if (backdrop) backdrop.style.display = 'block';
-        if (btn) btn.textContent = '<i class="fas fa-times"></i> Quitter cinéma';
+        if (btn) btn.innerHTML = '<i class="fas fa-times"></i> Quitter cinéma';
         const v = vid(); if (v && v.paused) v.play().catch(() => { });
       } else {
         if (backdrop) backdrop.style.display = 'none';
-        if (btn) btn.textContent = '<i class="fas fa-expand"></i> Cinéma';
+        if (btn) btn.innerHTML = '<i class="fas fa-expand"></i> Cinéma';
       }
     },
     quickDownload() {
@@ -549,7 +558,8 @@ const Player = (() => {
 
         const nTitle = document.getElementById('n-video-title');
         if (nTitle) nTitle.textContent = title;
-        if (!_cinemaActive) pub.toggleCinema();
+        // N'active le mode cinéma automatiquement que pour les vidéos directes (pas embeds)
+        if (type !== 'youtube' && type !== 'vimeo' && !_cinemaActive) pub.toggleCinema();
         if (rawUrl.startsWith('http') && type !== 'hls') { loadVfp(rawUrl).catch(() => { }); }
         return method;
       } catch (err) {
@@ -642,8 +652,8 @@ const Player = (() => {
 
         const pct = (v.currentTime / v.duration * 100) || 0;
         if (fill) fill.style.width = pct + '%';
-        if (current) current.textContent = fmtDur(v.currentTime);
-        if (duration && !isNaN(v.duration)) duration.textContent = fmtDur(v.duration);
+        if (current) current.textContent = fmtTime(v.currentTime);
+        if (duration && !isNaN(v.duration)) duration.textContent = fmtTime(v.duration);
         if (container) container.setAttribute('aria-valuenow', Math.round(pct));
     },
     handleProgressClick(e) {
