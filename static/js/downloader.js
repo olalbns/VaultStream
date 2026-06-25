@@ -353,9 +353,12 @@ async function retryDl(id) {
 
 function playDownloaded(filename) {
   const url = `/api/downloads/file?f=${encodeURIComponent(filename)}`;
+  // Afficher le lien nav avant showPage
+  const navLink = document.getElementById('nav-player-link');
+  if (navLink) navLink.style.display = 'block';
   showPage('player');
-  document.getElementById('nav-player-link').style.display = 'block';
-  Player.load(url);
+  // Attendre que le DOM player soit monté avant de lancer la lecture
+  setTimeout(() => Player.load(url), 100);
 }
 
 function statusLabel(s) {
