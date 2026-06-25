@@ -135,8 +135,8 @@ function onMainInput() {
     setHint('Vidéo Facebook détectée 👥', 'ok'); return;
   }
   
-  if (val.length > 10 && !val.startsWith('http')) {
-    setHint('L\'URL doit commencer par https://', 'error'); return;
+  if (val.length > 10 && !val.startsWith('http') && !val.startsWith('magnet:') && !/^[a-fA-F0-9]{40}$/.test(val)) {
+    setHint('URL invalide — commence par https:// ou magnet:?xt=…', 'error'); return;
   }
   setHint('Lien prêt à être analysé', 'info');
 }
@@ -504,9 +504,13 @@ const _origShowPage = showPage;
 // Override loadFromHome to also load playlist
 async function loadFromHome() {
   const rawUrl = document.getElementById('main-url-input')?.value.trim();
-  const url = normalizeYoutubeUrl(rawUrl);
+  if (!rawUrl) { setHint('Colle un lien ou JSON', 'error'); return; }
+  // Ne pas normaliser les magnets, infohash ou JSON via normalizeYoutubeUrl
+  const isMagnet = rawUrl.startsWith('magnet:') || /^[a-fA-F0-9]{40}$/.test(rawUrl);
+  const isJson   = rawUrl.startsWith('{') || rawUrl.startsWith('[');
+  const url = (isMagnet || isJson) ? rawUrl : normalizeYoutubeUrl(rawUrl);
   if (!url) { setHint('Colle un lien ou JSON', 'error'); return; }
-  if (!isValidInput(url)) { setHint('URL invalide', 'error'); return; }
+  if (!isValidInput(url)) { setHint('URL invalide — vérifie le format', 'error'); return; }
 
   setHint('Chargement…', 'info');
   const btn = document.getElementById('home-load-btn');
