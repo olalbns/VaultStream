@@ -409,7 +409,20 @@ const Player = (() => {
         body: JSON.stringify({ url, format_id: 'best', ext: 'mp4' }),
       }).then(r => r.json()).then(data => {
         if (!data.ok) { hideDlBar(); toast('Erreur: ' + (data.error || '?'), '<i class="fas fa-times"></i>'); return; }
-        _dlBarId = data.id; pollDlBar();
+        _dlBarId = data.id;
+        pollDlBar();
+        // Optionnel : Basculer vers le stream live si l'utilisateur le souhaite ou automatiquement
+        toast('Téléchargement en cours. Lecture live disponible.', '<i class="fas fa-stream"></i>');
+        // On attend un court instant que le fichier .part soit créé côté serveur
+        setTimeout(() => {
+          if (_dlBarId === data.id) {
+             pub.diag('info', 'Live Stream', 'Bascule vers flux live du téléchargement');
+             resetVideo();
+             vid().src = `/api/stream/live?id=${data.id}`;
+             vid().load();
+             vid().play().catch(() => {});
+          }
+        }, 2000);
       }).catch(e => { hideDlBar(); toast('Erreur: ' + e.message, '<i class="fas fa-times"></i>'); });
     },
 
@@ -639,6 +652,36 @@ const Player = (() => {
         const pos = (e.clientX - rect.left) / rect.width;
         vid().currentTime = pos * vid().duration;
     },
+    initCast() {
+        window['__onGCastApiAvailable'] = function(isAvailable) {
+            if (isAvailable) {
+                cast.framework.CastContext.getInstance().setOptions({
+                    receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+                    autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+                });
+            }
+        };
+    },
+
+    castCurrent() {
+        const castSession = cast.framework.CastContext.getInstance().getCurrentSession();
+        if (!castSession) {
+            toast('Aucun appareil Cast connecté', '<i class="fab fa-google"></i>');
+            return;
+        }
+        const url = _url.startsWith('/') ? window.location.origin + _url : _url;
+        const mediaInfo = new chrome.cast.media.MediaInfo(url, 'video/mp4');
+        mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
+        mediaInfo.metadata.title = $('player-breadcrumb').textContent;
+        mediaInfo.metadata.images = [{ url: window.location.origin + '/static/icons/favicon.svg' }];
+
+        const request = new chrome.cast.media.LoadRequest(mediaInfo);
+        castSession.loadMedia(request).then(
+            () => toast('Casting...', '<i class="fab fa-google"></i>'),
+            (err) => toast('Erreur Cast: ' + err, '<i class="fas fa-times"></i>')
+        );
+    },
+
     toggleSidebarSection(id) {
         const sidebar = document.getElementById('player-sidebar');
         const sections = ['playlist-block', 'sidebar-queue-block', 'diag-settings'];
@@ -676,6 +719,7 @@ const Player = (() => {
   };
 
   document.addEventListener('DOMContentLoaded', () => {
+    pub.initCast();
     const v = document.getElementById('main-video');
     const controls = document.getElementById('netflix-controls');
 

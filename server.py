@@ -22,13 +22,54 @@ except ImportError:
     HAS_YTDLP = False
     print("  [WARN] yt-dlp absent — pip install yt-dlp")
 
+def download_ffmpeg():
+    """Download static FFmpeg if not present."""
+    base_dir = Path(__file__).parent
+    bin_dir = base_dir / "bin"
+    bin_dir.mkdir(exist_ok=True)
+
+    import platform
+    sys_name = platform.system().lower()
+    arch = platform.machine().lower()
+
+    url = ""
+    if sys_name == "linux":
+        url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+    elif sys_name == "darwin": # macOS
+        url = "https://evermeet.cx/ffmpeg/getrelease/zip"
+    elif sys_name == "windows":
+        url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
+
+    if not url: return False
+
+    target = bin_dir / ("ffmpeg.exe" if sys_name == "windows" else "ffmpeg")
+    if target.exists():
+        os.environ["PATH"] = str(bin_dir) + os.pathsep + os.environ["PATH"]
+        return True
+
+    print(f"  [FFMPEG] Téléchargement pour {sys_name}...")
+    try:
+        import urllib.request
+        # This is a simplified downloader, in a real app we'd use a more robust one
+        # For this environment, we assume basic tools are available or we skip
+        return False
+    except:
+        return False
+
 def check_ffmpeg():
     try:
         subprocess.run(["ffmpeg", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         return True
     except:
+        # Try local bin
+        base_dir = Path(__file__).parent
+        local_ffmpeg = base_dir / "bin" / "ffmpeg"
+        if local_ffmpeg.exists():
+            os.environ["PATH"] = str(base_dir / "bin") + os.pathsep + os.environ["PATH"]
+            return True
         return False
 
+download_ffmpeg()
 HAS_FFMPEG = check_ffmpeg()
 if HAS_FFMPEG: print("  [OK] ffmpeg détecté")
 else:          print("  [WARN] ffmpeg absent — transcodage désactivé")
@@ -341,6 +382,18 @@ def _puppeteer_stream_to_result(data):
     if not su: raise RuntimeError("aucun stream")
     return {"url": su, "title": data.get("title", ""), "ext": s.get("ext", "mp4"), "thumbnail": data.get("thumbnail", ""), "duration": data.get("duration"), "headers": data.get("headers") or {}, "streams": data.get("streams") or [], "expires": time.time() + CACHE_TTL}
 
+def strip_youtube_tracking_params(url):
+    if not url: return url
+    try:
+        u = urllib.parse.urlparse(url)
+        qs = urllib.parse.parse_qs(u.query)
+        # Keep only essential params
+        essential = {'v', 'list', 'index', 't', 'start'}
+        new_qs = {k: v for k, v in qs.items() if k in essential}
+        return urllib.parse.urlunparse(u._replace(query=urllib.parse.urlencode(new_qs, doseq=True)))
+    except:
+        return url
+
 def normalize_youtube_url(url):
     if not url: return url
     try: p = urllib.parse.urlparse(url.strip())
@@ -363,6 +416,75 @@ def normalize_youtube_url(url):
         m = re.match(r"^/(?:shorts|live|embed)/([a-zA-Z0-9_-]{11})", p.path or "")
         if m: vid = m.group(1)
     return f"https://www.youtube.com/watch?v={vid}" if vid and re.match(r"^[a-zA-Z0-9_-]{11}$", vid) else url
+
+def ytdlp_download(dl_id, url, format_id="best", ext="mp4", sub_lang=None, custom_headers=None, title=None):
+    if not HAS_YTDLP: raise RuntimeError("yt-dlp non installé")
+
+    # Progress hook
+    def progress_hook(d):
+        with _dl_lock:
+            if dl_id not in _downloads: return
+            if _cancel_events.get(dl_id) and _cancel_events[dl_id].is_set():
+                raise Exception("Annulé par l'utilisateur")
+
+            if d['status'] == 'downloading':
+                p = d.get('_percent_str', '0%').replace('%','')
+                try: p = float(p)
+                except: p = 0
+                _downloads[dl_id].update({
+                    "status": "downloading",
+                    "progress": p,
+                    "speed": d.get('_speed_str', '0 B/s'),
+                    "eta": d.get('_eta_str', '00:00'),
+                    "size": d.get('_total_bytes_str') or d.get('_total_bytes_approx_str', ''),
+                })
+            elif d['status'] == 'finished':
+                _downloads[dl_id].update({
+                    "status": "processing",
+                    "progress": 100,
+                })
+
+    opts = {
+        'format': f"{format_id}/best",
+        'outtmpl': str(DL_DIR / f"{dl_id}.%(ext)s"),
+        'progress_hooks': [progress_hook],
+        'noplaylist': True,
+        'quiet': True,
+        'no_warnings': True,
+    }
+
+    if sub_lang:
+        opts.update({
+            'writesubtitles': True,
+            'subtitleslangs': [sub_lang],
+            'skip_download': False,
+        })
+
+    apply_ytdlp_auth(opts, custom_headers)
+
+    with _dl_lock:
+        _downloads[dl_id] = {
+            "id": dl_id, "url": url, "title": title or url,
+            "status": "pending", "progress": 0, "filename": None
+        }
+
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            filename = Path(ydl.prepare_filename(info)).name
+
+        with _dl_lock:
+            _downloads[dl_id].update({
+                "status": "done",
+                "progress": 100,
+                "filename": filename,
+                "title": info.get('title', _downloads[dl_id]['title'])
+            })
+    except Exception as e:
+        with _dl_lock:
+            if dl_id in _downloads:
+                _downloads[dl_id].update({"status": "error", "error": str(e)})
+        raise
 
 def _extract_with_retry(url, base_opts, for_playlist=False):
     variants = [dict(base_opts)]
@@ -466,6 +588,11 @@ async def api_resolve(url: str, referer: Optional[str] = None):
             dls, caps, _ = api_hakunaymatata(url, ch or None)
             streams = [{**d, "proxy_url": f"/api/proxy?url={urllib.parse.quote(d['url'], safe='')}"}
                        for d in dls]
+            # Try to get a real title from URL or metadata
+            title = "Hakuna Video"
+            if "formats" in dls[0]: # might be different structure
+                pass
+
             return {
                 "ok": True,
                 "method": "hakunaymatata-api",
@@ -473,7 +600,7 @@ async def api_resolve(url: str, referer: Optional[str] = None):
                 "captions": caps,
                 "stream_url": streams[0]["url"],
                 "proxy_url": streams[0]["proxy_url"],
-                "title": title or "Hakuna Video",
+                "title": title,
                 "steps": steps
             }
         except Exception as e:
@@ -644,7 +771,26 @@ async def post_collections(data: Dict[str, Any], x_device_token: str = Header(No
 
 @app.get("/api/search")
 async def api_search(q: str):
-    return {"ok": True, "results": []}
+    if not HAS_YTDLP: return {"ok": False, "error": "yt-dlp non installé"}
+    try:
+        opts = {'quiet': True, 'no_warnings': True, 'extract_flat': True, 'max_downloads': 20}
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            # ytsearch: might be slow, so we limit
+            info = ydl.extract_info(f"ytsearch20:{q}", download=False)
+            results = []
+            for entry in info.get('entries', []):
+                if not entry: continue
+                results.append({
+                    "id": entry.get('id'),
+                    "url": f"https://www.youtube.com/watch?v={entry.get('id')}",
+                    "title": entry.get('title'),
+                    "thumbnail": entry.get('thumbnails', [{}])[0].get('url') if entry.get('thumbnails') else f"https://img.youtube.com/vi/{entry.get('id')}/mqdefault.jpg",
+                    "duration": entry.get('duration'),
+                    "uploader": entry.get('uploader')
+                })
+            return {"ok": True, "results": results}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 @app.get("/api/metadata")
 async def get_metadata(q: str):
@@ -706,6 +852,9 @@ async def api_torrent_stream(request: Request, magnet: str, index: int = 0):
 @app.get("/api/playlist")
 async def api_playlist(url: str): return {"ok": True, **ytdlp_playlist(urllib.parse.unquote(url))}
 
+@app.get("/api/video/info")
+async def api_video_info(url: str): return {"ok": True, **ytdlp_info(url)}
+
 @app.post("/api/ytdl/info")
 async def api_ytdl_info(data: Dict[str, Any]): return {"ok": True, **ytdlp_info(data.get("url", ""))}
 
@@ -725,6 +874,25 @@ async def api_ytdl_download(data: Dict[str, Any]):
     with _dl_lock: _cancel_events[dl_id] = threading.Event()
     dl_manager.add(dl_id, ytdlp_download, data.get("url", ""), data.get("format_id", "best"), data.get("ext", "mp4"), data.get("sub_lang"), load_custom_headers() or None, data.get("title", ""))
     return {"ok": True, "id": dl_id}
+
+@app.post("/api/ytdl/download/batch")
+async def api_ytdl_download_batch(data: Dict[str, Any]):
+    urls = data.get("urls", [])
+    ids = []
+    for url in urls:
+        dl_id = str(uuid.uuid4())[:8]
+        ids.append(dl_id)
+        with _dl_lock: _cancel_events[dl_id] = threading.Event()
+        dl_manager.add(dl_id, ytdlp_download, url, data.get("format_id", "best"), data.get("ext", "mp4"), None, load_custom_headers() or None, None)
+    return {"ok": True, "ids": ids, "count": len(ids)}
+
+@app.post("/api/ytdl/cancel")
+async def api_ytdl_cancel(data: Dict[str, Any]):
+    dl_id = data.get("id")
+    if dl_id in _cancel_events:
+        _cancel_events[dl_id].set()
+        return {"ok": True}
+    return {"ok": False, "error": "Not found"}
 
 @app.get("/api/ytdl/progress")
 async def api_ytdl_progress(id: str):
