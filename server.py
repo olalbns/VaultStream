@@ -866,22 +866,31 @@ async def api_torrent_stream(request: Request, magnet: str, index: int = 0):
 async def api_playlist(url: str):
     u = urllib.parse.unquote(url)
     if u.startswith("magnet:") or (len(u) == 40 and re.fullmatch(r'[a-fA-F0-9]{40}', u)):
-        return {"ok": False, "is_playlist": False, "error": "Les liens magnets ne supportent pas les playlists", "items": []}
-    return {"ok": True, **ytdlp_playlist(u)}
+        return {"ok": False, "is_playlist": False, "error": "Magnet non supporté ici", "items": []}
+    try:
+        return {"ok": True, **ytdlp_playlist(u)}
+    except Exception as e:
+        return {"ok": False, "is_playlist": False, "error": str(e), "items": []}
 
 @app.get("/api/video/info")
 async def api_video_info(url: str):
     u = urllib.parse.unquote(url)
     if u.startswith("magnet:") or (len(u) == 40 and re.fullmatch(r'[a-fA-F0-9]{40}', u)):
         return {"ok": False, "error": "Lien magnet — téléchargement via torrent_engine uniquement"}
-    return {"ok": True, **ytdlp_info(u)}
+    try:
+        return {"ok": True, **ytdlp_info(u)}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "formats": [], "subtitles": []}
 
 @app.post("/api/ytdl/info")
 async def api_ytdl_info(data: Dict[str, Any]):
     u = data.get("url", "")
     if u.startswith("magnet:") or (len(u) == 40 and re.fullmatch(r'[a-fA-F0-9]{40}', u)):
         return {"ok": False, "error": "Lien magnet — téléchargement via torrent_engine uniquement"}
-    return {"ok": True, **ytdlp_info(u)}
+    try:
+        return {"ok": True, **ytdlp_info(u)}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "formats": [], "subtitles": []}
 
 @app.get("/api/intercept/latest")
 async def intercept_latest():

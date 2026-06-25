@@ -72,7 +72,12 @@ const Player = (() => {
   }
 
   // ── UI ───────────────────────────────────────────────
-  const showStage = () => { $('stage-idle').style.display = 'none'; $('stage-video').style.display = 'block'; };
+  const showStage = () => {
+    const stage = $('player-stage'); if (stage) stage.style.display = '';
+    const v = vid(); if (v) { v.style.display = 'block'; }
+    const f = ifr(); if (f) f.style.display = 'none';
+    hideErr();
+  };
   const spin = (l, s = '') => { $('stage-spinner').classList.remove('hidden'); $('spinner-label').textContent = l; $('spinner-sub').textContent = s; };
   const unspin = () => $('stage-spinner').classList.add('hidden');
   const showErr = msg => { unspin(); vid().style.display = 'none'; ifr().style.display = 'none'; $('stage-error').style.display = 'flex'; $('stage-error-msg').textContent = msg; };
@@ -496,10 +501,11 @@ const Player = (() => {
     },
 
     reset() {
-      freeBlob(); destroyHls(); vid().pause(); vid().removeAttribute('src'); vid().load();
-      vid().style.display = 'block'; ifr().src = ''; ifr().style.display = 'none';
-      $('stage-idle').style.display = ''; $('stage-video').style.display = 'none';
-      hideErr(); unspin(); $('method-bar').style.display = 'none';
+      freeBlob(); destroyHls();
+      const v = vid(); if (v) { v.pause(); v.removeAttribute('src'); v.load(); v.style.display = 'block'; }
+      const f = ifr(); if (f) { f.src = ''; f.style.display = 'none'; }
+      hideErr(); unspin();
+      const mbar = $('method-bar'); if (mbar) mbar.style.display = 'none';
       const qbar = $('quality-bar'); if (qbar) qbar.style.display = 'none';
       const sblock = $('subs-block'); if (sblock) sblock.style.display = 'none';
       const panel = $('video-formats-panel'); if (panel) panel.style.display = 'none';
@@ -508,10 +514,16 @@ const Player = (() => {
 
     async load(rawUrl) {
       if (!rawUrl) return;
+      // Si la page player n'est pas encore affichée, on attend qu'elle soit montée
+      const playerPage = document.getElementById('page-player');
+      if (playerPage && !playerPage.classList.contains('active')) {
+        if (typeof showPage === 'function') showPage('player');
+        await new Promise(r => setTimeout(r, 80)); // laisser le DOM se render
+      }
       rawUrl = normalizeYoutubeUrl(rawUrl);
       _url = rawUrl; _streams = [];
       pub.clearDiag(); showStage(); spin('Analyse…'); hideErr();
-      $('method-bar').style.display = 'none';
+      const mbar = $('method-bar'); if (mbar) mbar.style.display = 'none';
       const qbar = $('quality-bar'); if (qbar) qbar.style.display = 'none';
       const sblock = $('subs-block'); if (sblock) sblock.style.display = 'none';
       const panel = $('video-formats-panel'); if (panel) panel.style.display = 'none';
