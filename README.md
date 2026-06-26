@@ -1,4 +1,4 @@
-# StreamVault v7 - Ultime
+# StreamVault v7 
 
 Lecteur vidéo universel avec proxy CORS intégré, support Torrent, enrichissement métadonnées et Casting.
 Lis n'importe quelle vidéo — CDN signé, MP4 direct, YouTube, Vimeo, et Magnets Torrent.
