@@ -831,9 +831,24 @@ async def get_metadata(q: str):
 @app.get("/api/torrent/status")
 async def api_torrent_status(magnet: str):
     """Proxy status request to torrent engine."""
+    ensure_torrent_engine()
     try:
         async with httpx.AsyncClient() as client:
-            resp = await client.get(f"http://localhost:5001/status?magnet={urllib.parse.quote(magnet)}")
+            resp = await client.get(f"http://127.0.0.1:5001/status?magnet={urllib.parse.quote(magnet)}", timeout=5)
+            return resp.json()
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+@app.post("/api/torrent/add")
+async def api_torrent_add(data: Dict[str, Any]):
+    """Ajoute un magnet au moteur WebTorrent."""
+    magnet = data.get("magnet", "")
+    if not magnet: raise HTTPException(status_code=400, detail="magnet manquant")
+    ensure_torrent_engine()
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"http://127.0.0.1:5001/add?magnet={urllib.parse.quote(magnet)}", timeout=15)
             return resp.json()
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -973,11 +988,100 @@ async def api_probe(url: str):
     except Exception as e:
         return {"ok": False, "status": 0, "error": str(e)}
 
+_torrent_engine_started = False
+
+def ensure_torrent_engine():
+    """Démarre le moteur WebTorrent si pas encore actif."""
+    global _torrent_engine_started
+    if _torrent_engine_started:
+        return
+    try:
+        import urllib.request as _ur
+        _ur.urlopen("http://127.0.0.1:5001/list", timeout=1).read()
+        _torrent_engine_started = True
+        return  # Déjà actif
+    except Exception:
+        pass
+    try:
+        engine_path = BASE_DIR / "scripts" / "torrent_engine.js"
+        subprocess.Popen(["node", str(engine_path)],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         cwd=str(BASE_DIR))
+        time.sleep(2)  # Laisser le temps de démarrer
+        _torrent_engine_started = True
+        print("  [OK] Torrent engine démarré")
+    except Exception as e:
+        print(f"  [WARN] Torrent engine: {e}")
+
+def torrent_download(dl_id: str, magnet: str):
+    """Gère le téléchargement d'un magnet via le moteur WebTorrent."""
+    import urllib.request as _ur
+    import urllib.error as _ue
+
+    with _dl_lock:
+        _downloads[dl_id] = {
+            "id": dl_id, "url": magnet, "title": magnet[:60] + "…",
+            "status": "pending", "progress": 0, "filename": None,
+            "type": "torrent"
+        }
+
+    ensure_torrent_engine()
+
+    # Envoyer le magnet au moteur
+    encoded = urllib.parse.quote(magnet, safe='')
+    try:
+        resp = _ur.urlopen(f"http://127.0.0.1:5001/add?magnet={encoded}", timeout=15)
+        data = json.loads(resp.read())
+        with _dl_lock:
+            if dl_id in _downloads:
+                _downloads[dl_id]["title"] = data.get("name") or magnet[:60] + "…"
+                _downloads[dl_id]["status"] = "downloading"
+    except Exception as e:
+        with _dl_lock:
+            if dl_id in _downloads:
+                _downloads[dl_id].update({"status": "error", "error": f"Moteur torrent inaccessible: {e}"})
+        return
+
+    # Poll la progression pendant 24h max
+    for _ in range(24 * 3600 // 3):
+        if _cancel_events.get(dl_id) and _cancel_events[dl_id].is_set():
+            with _dl_lock:
+                if dl_id in _downloads: _downloads[dl_id]["status"] = "cancelled"
+            break
+        try:
+            resp = _ur.urlopen(f"http://127.0.0.1:5001/status?magnet={encoded}", timeout=5)
+            info = json.loads(resp.read())
+            with _dl_lock:
+                if dl_id not in _downloads: break
+                dl = _downloads[dl_id]
+                dl["progress"] = info.get("progress", 0)
+                dl["status"] = "done" if info.get("done") else "downloading"
+                dl["speed"] = f"{info.get('downloadSpeed', 0) / 1024:.0f} KB/s"
+                dl["peers"] = info.get("numPeers", 0)
+                if info.get("name"): dl["title"] = info["name"]
+                # Trouver le premier fichier vidéo téléchargé
+                for f in (info.get("files") or []):
+                    if f.get("isVideo") and f.get("progress", 0) > 0:
+                        dl["filename"] = f["name"]
+                        break
+                if dl["status"] == "done":
+                    break
+        except Exception:
+            pass
+        time.sleep(3)
+
 @app.post("/api/ytdl/download")
 async def api_ytdl_download(data: Dict[str, Any]):
+    url = data.get("url", "")
     dl_id = str(uuid.uuid4())[:8]
     with _dl_lock: _cancel_events[dl_id] = threading.Event()
-    dl_manager.add(dl_id, ytdlp_download, data.get("url", ""), data.get("format_id", "best"), data.get("ext", "mp4"), data.get("sub_lang"), load_custom_headers() or None, data.get("title", ""))
+    # Router les magnets vers le moteur WebTorrent
+    if url.startswith("magnet:") or (len(url) == 40 and re.fullmatch(r'[a-fA-F0-9]{40}', url)):
+        threading.Thread(target=torrent_download, args=(dl_id, url), daemon=True).start()
+    else:
+        dl_manager.add(dl_id, ytdlp_download, url, data.get("format_id", "best"),
+                       data.get("ext", "mp4"), data.get("sub_lang"),
+                       load_custom_headers() or None, data.get("title", ""))
     return {"ok": True, "id": dl_id}
 
 @app.post("/api/ytdl/download/batch")

@@ -255,8 +255,15 @@ function updateDlItem(dl) {
   el.querySelector('.dl-item-status').textContent = statusLabel(dl.status);
   el.querySelector('.dl-progress-fill').style.width = dl.progress + '%';
   el.querySelector('.dl-progress-pct').textContent = dl.progress + '%';
-  el.querySelector('.dl-progress-speed').textContent = dl.speed || '';
-  el.querySelector('.dl-progress-eta').textContent  = dl.eta ?'ETA: ' + dl.eta : '';
+  const speedEl = el.querySelector('.dl-progress-speed');
+  const etaEl   = el.querySelector('.dl-progress-eta');
+  if (dl.type === 'torrent') {
+    if (speedEl) speedEl.textContent = dl.speed || '';
+    if (etaEl)   etaEl.textContent   = dl.peers != null ? `${dl.peers} pairs` : '';
+  } else {
+    if (speedEl) speedEl.textContent = dl.speed || '';
+    if (etaEl)   etaEl.textContent   = dl.eta ? 'ETA: ' + dl.eta : '';
+  }
   if (dl.title) el.querySelector('.dl-item-title').textContent = dl.title;
   if (dl.status === 'done' && dl.filename) {
     const actionsEl = el.querySelector('.dl-item-actions');
@@ -266,7 +273,7 @@ function updateDlItem(dl) {
         <i class="fas fa-download"></i> Sauvegarder
       </a>
       <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
-        onclick="playDownloaded('${esc(dl.filename)}')"><i class="fas fa-play"></i> Lire</button>`;
+        onclick="playDownloaded('${esc(dl.filename)}')" ><i class="fas fa-play"></i> Lire</button>`;
   }
 }
 
