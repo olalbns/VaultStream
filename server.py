@@ -1112,16 +1112,26 @@ def torrent_download(dl_id: str, magnet: str):
                 if dl_id not in _downloads: break
                 dl = _downloads[dl_id]
                 dl["progress"] = info.get("progress", 0)
-                dl["status"] = "done" if info.get("done") else "downloading"
-                dl["speed"] = f"{info.get('downloadSpeed', 0) / 1024:.0f} KB/s"
-                dl["peers"] = info.get("numPeers", 0)
-                if info.get("name"): dl["title"] = info["name"]
-                # Trouver le premier fichier vidéo téléchargé
+                dl["status"]   = "done" if info.get("done") else "downloading"
+                dl["speed"]    = info.get("speedHuman", "")
+                dl["peers"]    = info.get("numPeers", 0)
+                if info.get("name"):   dl["title"] = info["name"]
+                # Taille totale en format lisible
+                length = info.get("length", 0)
+                if length > 0:
+                    if length >= 1073741824:
+                        dl["size"] = f"{length/1073741824:.1f} Go"
+                    elif length >= 1048576:
+                        dl["size"] = f"{length/1048576:.1f} Mo"
+                    else:
+                        dl["size"] = f"{length/1024:.0f} Ko"
+                # Trouver le premier fichier vidéo
                 for f in (info.get("files") or []):
-                    if f.get("isVideo") and f.get("progress", 0) > 0:
+                    if f.get("isVideo"):
                         dl["filename"] = f["name"]
                         break
                 if dl["status"] == "done":
+                    dl["progress"] = 100
                     break
         except Exception:
             pass
