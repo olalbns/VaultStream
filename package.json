@@ -1,8 +1,8 @@
 {
   "name": "streamvault",
   "version": "1.0.0",
+  "description": "VaultStream torrent engine",
   "dependencies": {
-    "puppeteer": "^24.40.0",
-    "webtorrent": "^2.4.3"
+    "torrent-stream": "^1.3.6"
   }
 }

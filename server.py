@@ -591,15 +591,28 @@ async def lifespan(app_):
     # Démarrer le moteur WebTorrent
     try:
         engine_path = BASE_DIR / "scripts" / "torrent_engine.js"
-        if engine_path.exists():
+        if engine_path.exists() and shutil.which("node"):
             subprocess.Popen(
                 ["node", str(engine_path)],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                 cwd=str(BASE_DIR)
             )
-            print("  [OK] Moteur WebTorrent démarré sur :5001")
+            # Attendre que le moteur soit prêt (max 5s)
+            import urllib.request as _ur
+            for attempt in range(10):
+                await asyncio.sleep(0.5)
+                try:
+                    _ur.urlopen("http://127.0.0.1:5001/list", timeout=1).read()
+                    global _torrent_engine_started
+                    _torrent_engine_started = True
+                    print("  [OK] Moteur WebTorrent démarré sur :5001")
+                    break
+                except Exception:
+                    pass
+            else:
+                print("  [WARN] Moteur WebTorrent ne répond pas après 5s")
         else:
-            print("  [WARN] torrent_engine.js introuvable")
+            print("  [WARN] node ou torrent_engine.js introuvable")
     except Exception as e:
         print(f"  [WARN] Moteur torrent: {e}")
     # Sync cookies YouTube depuis env
