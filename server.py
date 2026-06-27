@@ -910,9 +910,11 @@ async def api_torrent_add(data: Dict[str, Any]):
 
 @app.get("/api/torrent/stream")
 async def api_torrent_stream(request: Request, magnet: str, index: int = 0):
-    """Proxy stream from torrent engine to client with range support."""
-    t_url = f"http://localhost:5001/stream?magnet={urllib.parse.quote(magnet)}&index={index}"
-    h = {"Range": request.headers.get("Range", "bytes=0-")}
+    """Proxy stream depuis le moteur torrent vers le client avec support Range."""
+    ensure_torrent_engine()
+    t_url = f"http://127.0.0.1:5001/stream?magnet={urllib.parse.quote(magnet, safe='')}&index={index}"
+    range_header = request.headers.get("Range", "")
+    h = {"Range": range_header} if range_header else {}
     try:
         async def stream_generator():
             async with httpx.AsyncClient() as client:
@@ -921,15 +923,16 @@ async def api_torrent_stream(request: Request, magnet: str, index: int = 0):
                         yield chunk
 
         async with httpx.AsyncClient() as client:
-            # Get headers for Content-Type and Length
-            resp = await client.head(t_url, headers=h)
-            return StreamingResponse(
-                stream_generator(),
-                status_code=resp.status_code,
-                headers=dict(resp.headers)
-            )
+            probe = await client.head(t_url, timeout=10)
+            resp_headers = {
+                k: v for k, v in probe.headers.items()
+                if k.lower() in ("content-type", "content-length", "content-range", "accept-ranges")
+            }
+            resp_headers["Accept-Ranges"] = "bytes"
+            status = 206 if range_header else 200
+            return StreamingResponse(stream_generator(), status_code=status, headers=resp_headers)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=str(e))
+        raise HTTPException(status_code=502, detail=f"Moteur torrent inaccessible: {e}")
 
 @app.get("/api/playlist")
 async def api_playlist(url: str):

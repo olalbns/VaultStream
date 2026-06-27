@@ -251,29 +251,33 @@ function trackDownload(dlId) {
 function updateDlItem(dl) {
   const el = document.getElementById(`dl-item-${dl.id}`);
   if (!el) return;
-  el.querySelector('.dl-item-status').className = `dl-item-status ${dl.status}`;
-  el.querySelector('.dl-item-status').textContent = statusLabel(dl.status);
-  el.querySelector('.dl-progress-fill').style.width = dl.progress + '%';
-  el.querySelector('.dl-progress-pct').textContent = dl.progress + '%';
-  const speedEl = el.querySelector('.dl-progress-speed');
-  const etaEl   = el.querySelector('.dl-progress-eta');
+
   if (dl.type === 'torrent') {
-    if (speedEl) speedEl.textContent = dl.speed || '';
-    if (etaEl)   etaEl.textContent   = dl.peers != null ? `${dl.peers} pairs` : '';
-  } else {
-    if (speedEl) speedEl.textContent = dl.speed || '';
-    if (etaEl)   etaEl.textContent   = dl.eta ? 'ETA: ' + dl.eta : '';
+    // Re-render la carte torrent complète pour garder les stats à jour
+    el.outerHTML = renderTorrentCard(dl);
+    return;
   }
-  if (dl.title) el.querySelector('.dl-item-title').textContent = dl.title;
+
+  // Mise à jour partielle pour les téléchargements yt-dlp normaux
+  const statusEl = el.querySelector('.dl-item-status');
+  if (statusEl) { statusEl.className = `dl-item-status ${dl.status}`; statusEl.textContent = statusLabel(dl.status); }
+  const fillEl = el.querySelector('.dl-progress-fill');
+  if (fillEl) fillEl.style.width = (dl.progress || 0) + '%';
+  const pctEl = el.querySelector('.dl-progress-pct');
+  if (pctEl) pctEl.textContent = (dl.progress || 0) + '%';
+  const speedEl = el.querySelector('.dl-progress-speed');
+  if (speedEl) speedEl.textContent = dl.speed || '';
+  const etaEl = el.querySelector('.dl-progress-eta');
+  if (etaEl) etaEl.textContent = dl.eta ? 'ETA: ' + dl.eta : '';
+  if (dl.title) { const t = el.querySelector('.dl-item-title'); if (t) t.textContent = dl.title; }
   if (dl.status === 'done' && dl.filename) {
     const actionsEl = el.querySelector('.dl-item-actions');
-    actionsEl.innerHTML = `
+    if (actionsEl) actionsEl.innerHTML = `
       <a href="/api/downloads/file?f=${encodeURIComponent(dl.filename)}" download
         class="btn-primary" style="font-size:11px;padding:7px 16px;text-decoration:none">
-        <i class="fas fa-download"></i> Sauvegarder
-      </a>
+        <i class="fas fa-download"></i> Sauvegarder</a>
       <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
-        onclick="playDownloaded('${esc(dl.filename)}')" ><i class="fas fa-play"></i> Lire</button>`;
+        onclick="playDownloaded('${esc(dl.filename)}')"><i class="fas fa-play"></i> Lire</button>`;
   }
 }
 
@@ -283,6 +287,125 @@ async function refreshDlList() {
     const data = await res.json();
     renderDlList(data);
   } catch {}
+}
+
+function renderDlCard(dl) {
+  return `<div class="dl-item" id="dl-item-${dl.id}">
+    <div class="dl-item-header">
+      <div class="dl-item-title">${esc(dl.title || dl.url || dl.id)}</div>
+      <span class="dl-item-status ${dl.status}">${statusLabel(dl.status)}</span>
+    </div>
+    <div class="dl-progress-bar"><div class="dl-progress-fill" style="width:${dl.progress||0}%"></div></div>
+    <div class="dl-progress-meta">
+      <span class="dl-progress-pct">${dl.progress||0}%</span>
+      <span class="dl-progress-speed">${dl.speed||''}</span>
+      <span class="dl-progress-eta">${dl.eta?'ETA: '+dl.eta:''}</span>
+      <span>${dl.size||''}</span>
+    </div>
+    ${dl.error?`<div style="font-size:11px;color:#ff6060;margin-top:6px"><i class="fas fa-times"></i> ${esc(dl.error)}</div>`:''}
+    <div class="dl-item-actions">
+      ${dl.status==='done'&&dl.filename?`
+        <a href="/api/downloads/file?f=${encodeURIComponent(dl.filename)}" download
+          class="btn-primary" style="font-size:11px;padding:7px 16px;text-decoration:none">
+          <i class="fas fa-download"></i> Sauvegarder</a>
+        <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
+          onclick="playDownloaded('${esc(dl.filename)}')"><i class="fas fa-play"></i> Lire</button>`:''}
+      ${dl.status==='error'?`
+        <button class="btn-primary" style="font-size:11px;padding:7px 14px"
+          onclick="retryDl('${dl.id}')"><i class="fas fa-sync"></i> Réessayer</button>`:''}
+      ${dl.status==='downloading'?`
+        <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
+          onclick="cancelDl('${dl.id}')">✕ Annuler</button>`:''}
+    </div>
+  </div>`;
+}
+
+function renderTorrentCard(dl) {
+  const isDone       = dl.status === 'done';
+  const isError      = dl.status === 'error';
+  const isActive     = dl.status === 'downloading' || dl.status === 'pending';
+  const pct          = dl.progress || 0;
+  const barColor     = isDone ? 'var(--green)' : isError ? 'var(--red)' : 'var(--cyan)';
+  const speedStr     = dl.speed  || '';
+  const peersStr     = dl.peers  != null ? `${dl.peers} pairs` : '';
+  const sizeStr      = dl.size   || '';
+  const name         = dl.title  || dl.url || dl.id;
+
+  return `<div class="dl-item torrent-card" id="dl-item-${dl.id}">
+    <!-- En-tête -->
+    <div class="dl-item-header">
+      <div style="display:flex;align-items:center;gap:8px;min-width:0">
+        <span style="color:var(--cyan);font-size:14px;flex-shrink:0"><i class="fas fa-magnet"></i></span>
+        <div class="dl-item-title" style="font-size:13px">${esc(name)}</div>
+      </div>
+      <span class="dl-item-status ${dl.status}">${statusLabel(dl.status)}</span>
+    </div>
+
+    <!-- Barre de progression -->
+    <div style="margin:10px 0 4px">
+      <div style="height:5px;background:var(--s3);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${barColor};
+          border-radius:3px;transition:width .4s ease;
+          ${isActive?'box-shadow:0 0 8px '+barColor:''}"></div>
+      </div>
+    </div>
+
+    <!-- Stats en grille -->
+    <div class="torrent-stats">
+      <div class="torrent-stat">
+        <span class="ts-label"><i class="fas fa-chart-bar"></i> Progression</span>
+        <span class="ts-value" style="color:${barColor};font-family:var(--font-mono)">${pct.toFixed(1)}%</span>
+      </div>
+      <div class="torrent-stat">
+        <span class="ts-label"><i class="fas fa-tachometer-alt"></i> Vitesse</span>
+        <span class="ts-value ts-speed">${speedStr || '—'}</span>
+      </div>
+      <div class="torrent-stat">
+        <span class="ts-label"><i class="fas fa-users"></i> Pairs</span>
+        <span class="ts-value ts-peers">${peersStr || '—'}</span>
+      </div>
+      <div class="torrent-stat">
+        <span class="ts-label"><i class="fas fa-hdd"></i> Taille</span>
+        <span class="ts-value">${sizeStr || '—'}</span>
+      </div>
+    </div>
+
+    <!-- Erreur -->
+    ${isError?`<div style="font-size:11px;color:var(--red2);margin-top:8px;padding:8px;
+      background:var(--accent-dim);border-radius:6px;border-left:3px solid var(--red)">
+      <i class="fas fa-times-circle"></i> ${esc(dl.error||'Erreur inconnue')}</div>`:''}
+
+    <!-- Actions -->
+    <div class="dl-item-actions" style="margin-top:10px">
+      ${isDone && dl.filename ? `
+        <a href="/api/downloads/file?f=${encodeURIComponent(dl.filename)}" download
+          class="btn-primary" style="font-size:11px;padding:7px 16px;text-decoration:none">
+          <i class="fas fa-download"></i> Sauvegarder</a>
+        <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
+          onclick="playDownloaded('${esc(dl.filename)}')">
+          <i class="fas fa-play"></i> Lire</button>` : ''}
+      ${isActive && dl.filename ? `
+        <button class="btn-ghost" style="font-size:11px;padding:7px 14px;color:var(--cyan);border-color:var(--cyan)"
+          onclick="streamTorrentLive('${esc(dl.url||'')}','${esc(dl.filename||'')}')">
+          <i class="fas fa-play-circle"></i> Lire en direct</button>` : ''}
+      ${isActive ? `
+        <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
+          onclick="cancelDl('${dl.id}')">✕ Annuler</button>` : ''}
+      ${isError ? `
+        <button class="btn-primary" style="font-size:11px;padding:7px 14px"
+          onclick="retryDl('${dl.id}')"><i class="fas fa-sync"></i> Réessayer</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function streamTorrentLive(magnet, filename) {
+  if (!magnet) return;
+  // Streamer directement depuis le moteur torrent (range-aware)
+  const streamUrl = `/api/torrent/stream?magnet=${encodeURIComponent(magnet)}&index=0`;
+  const navLink = document.getElementById('nav-player-link');
+  if (navLink) navLink.style.display = 'block';
+  showPage('player');
+  setTimeout(() => Player.load(streamUrl), 100);
 }
 
 function renderDlList(data) {
@@ -305,36 +428,7 @@ function renderDlList(data) {
     return;
   }
 
-  el.innerHTML = allDls.map(dl => `
-    <div class="dl-item" id="dl-item-${dl.id}">
-      <div class="dl-item-header">
-        <div class="dl-item-title">${esc(dl.title || dl.url || dl.id)}</div>
-        <span class="dl-item-status ${dl.status}">${statusLabel(dl.status)}</span>
-      </div>
-      <div class="dl-progress-bar">
-        <div class="dl-progress-fill" style="width:${dl.progress||0}%"></div>
-      </div>
-      <div class="dl-progress-meta">
-        <span class="dl-progress-pct">${dl.progress||0}%</span>
-        <span class="dl-progress-speed">${dl.speed||''}</span>
-        <span class="dl-progress-eta">${dl.eta?'ETA: '+dl.eta:''}</span>
-        <span>${dl.size||''}</span>
-      </div>
-      ${dl.error ?`<div style="font-size:11px;color:#ff6060;margin-top:6px"><i class="fas fa-times"></i> ${esc(dl.error)}</div>` : ''}
-      <div class="dl-item-actions">
-        ${dl.status==='done'&&dl.filename ?`
-          <a href="/api/downloads/file?f=${encodeURIComponent(dl.filename)}" download
-            class="btn-primary" style="font-size:11px;padding:7px 16px;text-decoration:none"><i class="fas fa-download"></i> Sauvegarder</a>
-          <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
-            onclick="playDownloaded('${esc(dl.filename)}')"><i class="fas fa-play"></i> Lire</button>` : ''}
-        ${dl.status==='error' ?`
-          <button class="btn-primary" style="font-size:11px;padding:7px 14px"
-            onclick="retryDl('${dl.id}')"><i class="fas fa-sync"></i> Réessayer</button>` : ''}
-        ${dl.status==='downloading' ?`
-          <button class="btn-ghost" style="font-size:11px;padding:7px 14px"
-            onclick="cancelDl('${dl.id}')">✕ Annuler</button>` : ''}
-      </div>
-    </div>`).join('');
+  el.innerHTML = allDls.map(dl => dl.type === 'torrent' ? renderTorrentCard(dl) : renderDlCard(dl)).join('');
 
   // Resume polling for active downloads
   allDls.filter(d => d.status === 'downloading' || d.status === 'processing')

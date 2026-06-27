@@ -3726,3 +3726,59 @@ a { text-decoration: none; color: inherit; }
 
 }
 
+
+/* ── Torrent Card ─────────────────────────────────────────── */
+
+.torrent-card {
+  border-left: 3px solid var(--cyan) !important;
+  background: linear-gradient(135deg, var(--bg-card) 0%, rgba(0,229,255,0.03) 100%) !important;
+}
+
+.torrent-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 10px 0 4px;
+  padding: 10px 12px;
+  background: var(--bg-input);
+  border-radius: 8px;
+  border: 1px solid var(--s3);
+}
+
+@media (max-width: 600px) {
+  .torrent-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
+.torrent-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ts-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+
+.ts-label i {
+  margin-right: 3px;
+  color: var(--cyan);
+  opacity: .7;
+}
+
+.ts-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ts-speed { color: var(--cyan); }
+.ts-peers { color: var(--yellow); }
+
