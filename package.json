@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "description": "VaultStream torrent engine",
   "dependencies": {
-    "torrent-stream": "^1.3.6"
+    "torrent-stream": "1.2.1"
   }
 }
