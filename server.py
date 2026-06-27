@@ -568,8 +568,49 @@ def ytdlp_playlist(url, custom_headers=None):
     if not ents: return {"is_playlist":False,"items":[{"url":url,"title":info.get("title","")}]}
     return {"is_playlist":True,"title":info.get("title") or info.get("playlist_title"),"count":len(ents),"items":[{"id":e.get("id"),"title":e.get("title"),"url":e.get("url") or e.get("webpage_url") or f"https://www.youtube.com/watch?v={e.get('id')}","thumbnail":e.get("thumbnail") or (f"https://img.youtube.com/vi/{e.get('id')}/mqdefault.jpg" if e.get("id") else ""),"duration":e.get("duration",0)} for e in ents if e]}
 
+def _find_ffmpeg() -> str:
+    """Cherche ffmpeg dans PATH et dans ~/.local/bin (installé par build.sh)."""
+    import shutil
+    # D'abord dans PATH standard
+    p = shutil.which("ffmpeg")
+    if p: return p
+    # Ensuite dans ~/.local/bin (Render)
+    local = os.path.expanduser("~/.local/bin/ffmpeg")
+    if os.path.isfile(local) and os.access(local, os.X_OK):
+        os.environ["PATH"] = os.path.dirname(local) + ":" + os.environ.get("PATH", "")
+        return local
+    return "ffmpeg"  # fallback
+
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app_):
+    """Démarrage de l'application : moteur torrent + détection FFmpeg."""
+    ffmpeg_path = _find_ffmpeg()
+    print(f"  [OK] FFmpeg: {ffmpeg_path}")
+    # Démarrer le moteur WebTorrent
+    try:
+        engine_path = BASE_DIR / "scripts" / "torrent_engine.js"
+        if engine_path.exists():
+            subprocess.Popen(
+                ["node", str(engine_path)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                cwd=str(BASE_DIR)
+            )
+            print("  [OK] Moteur WebTorrent démarré sur :5001")
+        else:
+            print("  [WARN] torrent_engine.js introuvable")
+    except Exception as e:
+        print(f"  [WARN] Moteur torrent: {e}")
+    # Sync cookies YouTube depuis env
+    _sync_cookie_file_from_env()
+    # Purge auto des vieux fichiers
+    threading.Thread(target=auto_purge_task, daemon=True).start()
+    yield  # Application en cours d'exécution
+    print("  [shutdown] StreamVault arrêté")
+
 # ── FastAPI App ─────────────────────────────────────
-app = FastAPI(title="StreamVault")
+app = FastAPI(title="StreamVault", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 @app.get("/", response_class=HTMLResponse)
@@ -1176,16 +1217,10 @@ def auto_purge_task():
         time.sleep(3600) # Run every hour
 
 def start_torrent_engine():
-    try:
-        subprocess.Popen(["node", "scripts/torrent_engine.js"],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print("  [OK] Torrent engine started")
-    except Exception as e:
-        print(f"  [WARN] Could not start torrent engine: {e}")
+    """Conservé pour compatibilité — le lifespan FastAPI le gère maintenant."""
+    pass
 
 
 if __name__ == "__main__":
     threading.Thread(target=auto_purge_task, daemon=True).start()
-    _sync_cookie_file_from_env()
-    start_torrent_engine()
     uvicorn.run(app, host=HOST, port=PORT)
